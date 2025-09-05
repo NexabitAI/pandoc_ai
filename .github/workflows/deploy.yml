@@ -1,0 +1,61 @@
+name: Deploy pandoc_ai HMS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      # Deploy backend
+      - name: Deploy backend
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          script: |
+            cd /var/www/pandoc_ai/HMS/paitentdoctorsystembackend
+            git reset --hard
+            git pull origin main
+            npm install
+      - name: Deploy pandoc 
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            cd /var/www/pandoc_ai/HMS/pandoc
+            git reset --hard
+            git pull origin main
+            npm install
+            npm run build
+            pm2 restart all || true
+
+      # Deploy pandocadmin frontend
+      - name: Deploy pandocadmin frontend
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          script: |
+            cd /var/www/pandoc_ai/HMS/pandocadmin
+            git reset --hard
+            git pull origin main
+            npm install
+            npm run build
+            pm2 restart all || true
