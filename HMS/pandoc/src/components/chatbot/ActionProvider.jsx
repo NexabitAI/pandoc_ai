@@ -1,4 +1,6 @@
-const DOCTOR_API = "https://paitentdoctorsystembackend.up.railway.app/api/doctor/list";
+const BACKEND_URL = "https://mypandoc.com";
+const DOCTOR_API = "https://mypandoc.com/api/doctor/list";
+
 
 class ActionProvider {
     constructor(createChatBotMessage, setStateFunc, state) {
@@ -22,7 +24,7 @@ class ActionProvider {
         this.updateChatbotState(loading);
 
         try {
-            const res = await fetch("http://localhost:4000/api/get-speciality", {
+            const res = await fetch(`${BACKEND_URL}/api/get-speciality`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ symptom }),
@@ -149,7 +151,7 @@ class ActionProvider {
 🏥 Address: ${doctor.address?.line1}, ${doctor.address?.line2}
 📝 About: ${doctor.about}
 💰 Fee: $${doctor.fees}
-🔗 [Book Appointment](http://localhost:5173/appointment/${doctor._id})
+🔗 [Book Appointment](${BACKEND_URL}/appointment/${doctor._id})
 `.trim();
 
         const msg = this.createChatBotMessage(info);

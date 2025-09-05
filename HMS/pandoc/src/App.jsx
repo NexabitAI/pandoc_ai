@@ -1,6 +1,6 @@
 import React from 'react'
 import Navbar from './components/Navbar'
-import { Routes, Route } from 'react-router-dom'
+import {BrowserRouter , Routes, Route } from 'react-router-dom'
 import Home from './pages/Home'
 import Doctors from './pages/Doctors'
 import Login from './pages/Login'
@@ -17,7 +17,9 @@ import ChatbotComponent from './components/chatbot/ChatbotComponent'
 
 const App = () => {
   return (
-    <div className='mx-4 sm:mx-[10%]'>
+    <BrowserRouter basename="/">
+
+     <div className='mx-4 sm:mx-[10%]'>
       <ToastContainer />
       <Navbar />
       <Routes>
@@ -35,6 +37,8 @@ const App = () => {
       <ChatbotComponent />
       <Footer />
     </div>
+
+</BrowserRouter>
   )
 }
 

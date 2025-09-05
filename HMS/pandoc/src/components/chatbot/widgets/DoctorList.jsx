@@ -13,7 +13,7 @@ const DoctorList = ({ payload }) => {
                     <p>Speciality: {doc.speciality}</p>
                     <p>Fee: ${doc.fees}</p>
                     <a
-                        href={`http://localhost:5173/appointment/${doc._id}`}
+                        href={`https://www.mypandoc.com/appointment/${doc._id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-block mt-2 bg-white text-blue-600 px-3 py-1 rounded font-medium"
