@@ -18,7 +18,7 @@ connectCloudinary()
 app.use(express.json())
 app.use(cors({
   origin: [
-      "https://mypandoc.com",
+    "https://mypandoc.com",
     "https://www.mypandoc.com",
     "https://admin.mypandoc.com"
   ],
