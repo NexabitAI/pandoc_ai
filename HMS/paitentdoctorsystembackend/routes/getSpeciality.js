@@ -2,7 +2,7 @@ import express from "express";
 import OpenAI from "openai";
 
 const router = express.Router();
-const openai = new OpenAI({ apiKey: "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" });
+const openai = new OpenAI({ apiKey: "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" });
 
 router.post("/", async (req, res) => {
     const { symptom } = req.body;
