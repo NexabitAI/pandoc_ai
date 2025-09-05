@@ -21,9 +21,9 @@ jobs:
       - name: Deploy all HMS services
         uses: appleboy/ssh-action@v1
         with:
+          host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_KEY }}
-          port: ${{ secrets.VPS_PORT }}
           script: |
             # Backend
             cd /var/www/pandoc_ai/HMS/paitentdoctorsystembackend
