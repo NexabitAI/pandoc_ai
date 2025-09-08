@@ -12,7 +12,7 @@ const Footer = () => {
             alt=""
           />
           <p className="w-full md:w-2/3 text-gray-600 leading-6">
-            Lorem Ipsum is a a simply dummy text of the printing
+            Lorem Ipsum is a  simply dummy text of the printing
             and typesetting industry. Lorem Ipsum has been
             the industry's standard dummy text ever since
             the 1500s, when an unknown printer took a galley
