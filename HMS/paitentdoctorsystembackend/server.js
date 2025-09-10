@@ -16,7 +16,7 @@ connectDB()
 connectCloudinary()
 
 // middlewares
-app.use('/api/specialties', specialtiesRouter);
+
 app.use(express.json())
 app.use(cors({
   origin: [
@@ -33,6 +33,7 @@ app.use("/api/user", userRouter)
 app.use("/api/admin", adminRouter)
 app.use("/api/doctor", doctorRouter)
 app.use("/api/get-speciality", getSpecialityRoute)
+app.use('/api/specialties', specialtiesRouter);
 
 app.get("/api", (req, res) => {
   res.send("API Working")
