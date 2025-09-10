@@ -40,7 +40,19 @@ const SPECIALTIES = [
     }
   }));
 
-  const res = await Specialty.bulkWrite(ops);
-  console.log('Upserted specialties:', res.nUpserted);
+  const res = await Specialty.bulkWrite(ops, { ordered: false });
+
+  // Robust result logging across mongoose/node-driver versions
+  const inserted = res.insertedCount ?? 0;
+  const upserted = res.upsertedCount ?? (Array.isArray(res.upsertedIds) ? res.upsertedIds.length : 0);
+  const matched = res.matchedCount ?? 0;
+  const modified = res.modifiedCount ?? 0;
+
+  console.log('Seed summary ->',
+    'inserted:', inserted,
+    'upserted:', upserted,
+    'matched:', matched,
+    'modified:', modified
+  );
   await mongoose.disconnect();
 })();
