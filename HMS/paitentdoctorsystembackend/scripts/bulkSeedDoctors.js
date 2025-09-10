@@ -10,9 +10,9 @@ import Specialty from '../models/Specialty.js'; // from earlier step
 
 // ----- Cloudinary setup -----
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  cloud_name: process.env.CLOUDINARY_NAME,
   api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  api_secret: process.env.CLOUDINARY_SECRET_KEY
 });
 
 // ----- Constants -----
@@ -61,7 +61,7 @@ function randInt(min, max) {
 }
 
 (async () => {
-  const url = process.env.MONGO_URL;
+  const url = process.env.MONGODB_URI;
   if (!url) throw new Error('Missing MONGO_URL in .env');
 
   await mongoose.connect(url);
