@@ -27,7 +27,7 @@ const SPECIALTIES = [
 ];
 
 (async () => {
-  const url = process.env.MONGO_URL;
+  const url = process.env.MONGODB_URI;
   if (!url) throw new Error('Missing MONGO_URL in .env');
   await mongoose.connect(url);
 
