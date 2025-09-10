@@ -7,6 +7,7 @@ import userRouter from "./routes/userRoute.js"
 import doctorRouter from "./routes/doctorRoute.js"
 import adminRouter from "./routes/adminRoute.js"
 import getSpecialityRoute from "./routes/getSpeciality.js";
+import specialtiesRouter from './routes/specialties.js';
 
 // app config
 const app = express()
@@ -15,6 +16,7 @@ connectDB()
 connectCloudinary()
 
 // middlewares
+app.use('/api/specialties', specialtiesRouter);
 app.use(express.json())
 app.use(cors({
   origin: [
