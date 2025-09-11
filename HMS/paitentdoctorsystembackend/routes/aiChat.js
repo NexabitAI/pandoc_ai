@@ -21,6 +21,8 @@ function lastUserWantsDoctors(txt = '') {
 
   // Keep it simple: a small set of normal regexes checked in order.
   const patterns = [
+    /\bshow (relevant|suitable)\s*doctor(s)?\b/,
+    /\bplease show (me )?(a|the)?\s*doctor(s)?\b/,
     /\bshow me (a|the)?\s*doctor(s)?\b/,
     /\bgive me (a|the)?\s*doctor(s)?\b/,
     /\bsend me (a|the)?\s*doctor(s)?\b/,
@@ -29,6 +31,8 @@ function lastUserWantsDoctors(txt = '') {
     /\bbook (a|the)?\s*doctor\b/,
     /\bdoctor please\b/,
     /\bany doctor(s)?\b/,
+    /\bjust show (me )?(a|the)?\s*doctor(s)?\b/,
+    /\bshow the doctor(s)?\b/,
     /\bshow doctor(s)?\b/,
     /\bshow doctors\b/,
     // last on purpose; broadest one:
@@ -37,7 +41,6 @@ function lastUserWantsDoctors(txt = '') {
 
   return patterns.some((rx) => rx.test(t));
 }
-
 
 function userSeemsDone(txt='') {
   const t = txt.toLowerCase();
@@ -119,139 +122,75 @@ function fallbackSpecialtiesFromText(text='') {
   if (/\bpedia|child|kid\b/.test(t)) picks.add('Pediatricians');
   if (/\bendocrin|thyroid|diabet\b/.test(t)) picks.add('Endocrinology, Diabetes & Metabolism');
   if (/\bbone(s)?\b|orthopedic|orthopaedic/.test(t)) picks.add('Orthopedic Surgery');
-  // t must be lowercase already: const t = text.toLowerCase()
-if (/\bdermat(o|ology|ologist)|skin|rash|acne|eczema|psoriasis|hives|itch|alopecia|hair loss|nail|fungus\b/.test(t)) picks.add('Dermatologist');
 
-if (/\bcardio|heart|chest pain|angina|palpitation|arrhythmia|murmur|hypertension|blood pressure\b/.test(t)) picks.add('Cardiology');
-
-if (/\blung|pulmo|breath(ing)?|shortness of breath|sob|wheeze|asthma|copd|pneumonia|cough|pleur|emphysema\b/.test(t)) picks.add('Pulmonology');
-
-if (/\bgastro|stomach|abdomen|abdominal|belly|gastric|acid reflux|gerd|ulcer|diarrhea|constipation|vomit|nausea|ibs|bloating|indigestion\b/.test(t)) picks.add('Gastroenterologist');
-
-if (/\bliver|hepat|jaundice|cirrhosis|fatty liver|hepatitis|biliary|gallbladder|cholecyst|\bascites\b/.test(t)) picks.add('Hepatology');
-
-if (/\bkidney|renal\b/.test(t)) picks.add('Nephrology');
-if (/\b(kidney|urinary|ureter|bladder|stone|uti|u(t|r)inary tract|prostate|testicular|erectile|penile|scrotal|varicocele|nocturia)\b/.test(t)) picks.add('Urology');
-
-if (/\bendocrin|hormone|thyroid|goiter|hyperthy|hypothy|diabet(es|ic)|insulin|pituitar(y)?|adrenal|pcos\b/.test(t)) picks.add('Endocrinology, Diabetes & Metabolism');
-
-if (/\brheumat|autoimmune|arthritis|gout|lupus|scleroderma|sjogren|vasculitis|ankylosing|psoriatic\b/.test(t)) picks.add('Rheumatology');
-
-if (/\binfect(ion)?|fever of unknown|hiv|aids|tb|malaria|typhoid|hepatitis\b/.test(t)) picks.add('Infectious Diseases');
-
-if (/\bblood|anemi(a)?|hemoglobin|clot|dvt|bleeding disorder|thrombo|platelet|hemophilia|sickle\b/.test(t)) picks.add('Hematology');
-
-if (/\bcancer|tumou?r|oncolog|mass|lump|metastasis|chemo(therapy)?\b/.test(t)) picks.add('Medical Oncology');
-
-if (/\ballerg(y|ies)?|immunolog|sneeze|hay fever|rhinitis|anaphylaxis|urticaria\b/.test(t)) picks.add('Allergy & Immunology');
-
-if (/\bneuro|brain|seiz(ure)?|epilep|stroke|tia|weakness|numb|tingl|parkinson|tremor|memory|dementia|migraine|headache|neuropath(y)?\b/.test(t)) picks.add('Neurologist');
-
-if (/\bpsychiat|mental|depress|anxiety|panic|bipolar|schizo|adhd|ocd|ptsd|addiction (treatment|help)?\b/.test(t)) picks.add('Psychiatry');
-if (/\baddiction|substance|alcohol(ism)?|opioid|drug (use|dependence)\b/.test(t)) picks.add('Addiction Medicine');
-
-if (/\bobgyn|gyne|gyn|pregnan|antenatal|postnatal|pelvic pain|pcos|fibroid|period|menstrual|menopause|uter(ine)?|ovary|cervix|vaginal\b/.test(t)) picks.add('Gynecologist');
-
-if (/\bpediatr(ic|ician|ics)|child|kid|toddler|infant|newborn|neonat(al|ology)?\b/.test(t)) picks.add('Pediatricians');
-
-if (/\bgeriatr(ic|ics)|elder(ly)?|senior|older adult\b/.test(t)) picks.add('Geriatric Medicine');
-
-if (/\bemergency|er|trauma|accident|urgent|laceration|acute distress|severe pain|fainted|unconscious\b/.test(t)) picks.add('Emergency Medicine');
-
-if (/\bcritical care|icu|ventilator|shock|sepsis\b/.test(t)) picks.add('Critical Care Medicine');
-
-if (/\banesthes(io|ia)|anesthetist|pain block\b/.test(t)) picks.add('Anesthesiology');
-
-if (/\bgeneral (surgery|surgeon)|append(ici)?tis|hernia|lump removal|biopsy|abscess drainage|gallbladder surgery|pilonoidal\b/.test(t)) picks.add('General Surgery');
-
-if (/\bcardiothoracic|heart surgery|bypass|cabg|valve\b/.test(t)) picks.add('Cardiothoracic Surgery');
-
-if (/\bvascular (surg|surgeon)?|peripheral artery|pad|claudication|aneurysm|carotid|varicose vein(s)?\b/.test(t)) picks.add('Vascular Surgery');
-
-if (/\bneurosurg(ery|eon)|brain surgery|spinal tumor\b/.test(t)) picks.add('Neurosurgery');
-
-if (/\borthopedic|orthopaedic|bone(s)?|fracture|sprain|ligament|tendon|rotator cuff|meniscus|dislocation|joint replacement\b/.test(t)) picks.add('Orthopedic Surgery');
-
-if (/\bsports (med|medicine)|sports injur(y|ies)|acl|mcl|tennis elbow|runner'?s knee|shin splints\b/.test(t)) picks.add('Sports Medicine');
-
-if (/\bent\b|\bear(ache| infection)?|hearing|tinnitus|nose|sinus(it|itis)|throat|tonsil|adenoid|hoarse|voice|snoring\b/.test(t)) picks.add('Otolaryngology (ENT)');
-
-if (/\bophthal|eye|vision|blurred vision|red eye|conjunctivitis|glaucoma|cataract|retina\b/.test(t)) picks.add('Ophthalmology');
-
-if (/\bplastic (and )?reconstruct(ive)?|cosmetic surgery|burn reconstruction|scar revision\b/.test(t)) picks.add('Plastic & Reconstructive Surgery');
-
-if (/\bhand (surgery|surgeon)?|carpal tunnel|trigger finger|hand tendon|dupuytren\b/.test(t)) picks.add('Hand Surgery');
-
-if (/\bspine (surgery|surgeon)?|sciatica (surgery)?|spinal stenosis\b/.test(t)) picks.add('Spine Surgery');
-
-if (/\bbreast lump|nipple discharge|mastectomy|lumpectomy|breast surgery\b/.test(t)) picks.add('Breast Surgery');
-
-if (/\bbariatric|weight loss surgery|gastric (bypass|sleeve)|obesity surgery\b/.test(t)) picks.add('Bariatric & Metabolic Surgery');
-
-if (/\bcolorectal|rectal|anal fissure|fistula|hemorrhoid|rectal bleeding|pilonidal\b/.test(t)) picks.add('Colorectal Surgery');
-
-if (/\btransplant (surgery|evaluation)|kidney transplant|liver transplant\b/.test(t)) picks.add('Transplant Surgery');
-
-if (/\bendocrine surgery|thyroid nodule surgery|parathyroid|adrenalectomy\b/.test(t)) picks.add('Endocrine Surgery');
-
-if (/\bpediatric (surgery|surgeon)\b/.test(t)) picks.add('Pediatric Surgery');
-
-if (/\bradiology|x-?ray|ct scan|mri|ultrasound (result)?\b/.test(t)) picks.add('Diagnostic Radiology');
-
-if (/\binterventional radiology|embolization|angioplasty|stent (placement)?\b/.test(t)) picks.add('Interventional Radiology');
-
-if (/\bradiation oncology|radiotherapy|brachytherapy\b/.test(t)) picks.add('Radiation Oncology');
-
-if (/\bnuclear medicine|pet[- ]?scan|thyroid uptake\b/.test(t)) picks.add('Nuclear Medicine');
-
-if (/\bpathology|biopsy report|histopathology\b/.test(t)) picks.add('Anatomic Pathology');
-
-if (/\bclinical pathology|lab medicine|coagulation workup\b/.test(t)) picks.add('Clinical Pathology (Laboratory Medicine)');
-
-if (/\bforensic (pathology|examiner)\b/.test(t)) picks.add('Forensic Pathology');
-
-if (/\bpm&r|physiatry|rehabilitation|stroke rehab|spinal cord injury|prosthetic\b/.test(t)) picks.add('Physical Medicine & Rehabilitation (PM&R)');
-
-if (/\bpain (clinic|medicine)|chronic pain|nerve pain|neuropathic pain\b/.test(t)) picks.add('Pain Medicine');
-
-if (/\bsleep (apnea|medicine)|insomnia|snor(ing|e)\b/.test(t)) picks.add('Sleep Medicine');
-
-if (/\boccupational (medicine|health)|work injury|industrial exposure\b/.test(t)) picks.add('Occupational & Environmental Medicine');
-
-if (/\bpalliative|hospice|end-of-life|comfort care\b/.test(t)) picks.add('Palliative Care / Hospice Medicine');
-
-if (/\bwound care|chronic ulcer|diabetic foot|pressure sore|bed sore\b/.test(t)) picks.add('Wound Care');
-
-if (/\bphlebology|vein clinic|varicose|spider veins\b/.test(t)) picks.add('Phlebology (Vein Medicine)');
-
-if (/\bclinical nutrition|diet counsel|malnutrition|tube feed|tpn|obesity (management)?\b/.test(t)) picks.add('Clinical Nutrition');
-
-if (/\bmen'?s health|andrology|erectile dysfunction|male infertility\b/.test(t)) picks.add('Men’s Health / Andrology');
-
-if (/\bwomen'?s health|pap smear|well woman exam\b/.test(t)) picks.add('Women’s Health');
-
-if (/\btravel (clinic|medicine)|travel vaccine|malaria prophylaxis|yellow fever\b/.test(t)) picks.add('Travel & Tropical Medicine');
-
-if (/\bmedical genetics|genomic(s)?|inherited disorder\b/.test(t)) picks.add('Medical Genetics & Genomics');
-
-if (/\bclinical informatics|ehr|interoperability\b/.test(t)) picks.add('Clinical Informatics');
-
-if (/\bhyperbaric (medicine|oxygen)\b/.test(t)) picks.add('Hyperbaric Medicine');
-
-if (/\bmedical toxicology|poison(ing)?|overdose|toxin exposure\b/.test(t)) picks.add('Medical Toxicology');
-
-if (/\bwilderness medicine|altitude sickness|frostbite|hypothermia\b/.test(t)) picks.add('Wilderness Medicine');
-
-if (/\bgeriatr(ic|ics) psychiatry|late-life depression|memory care\b/.test(t)) picks.add('Geriatric Psychiatry');
-
-if (/\bchild(ren)? (and )?adolescent psychiatry|adolescent mental health\b/.test(t)) picks.add('Child & Adolescent Psychiatry');
-
-if (/\bbehavioral neurology|neuropsychiatry\b/.test(t)) picks.add('Behavioral Neurology & Neuropsychiatry');
-
-if (/\bneurocritical care|icu neuro|intracranial pressure\b/.test(t)) picks.add('Neurocritical Care');
-
-if (/\baesthetic|cosmetic (medicine|injectable)|botox|filler\b/.test(t)) picks.add('Aesthetic Medicine');
-
+  // Extended coverage
+  if (/\bdermat(o|ology|ologist)|skin|rash|acne|eczema|psoriasis|hives|itch|alopecia|hair loss|nail|fungus\b/.test(t)) picks.add('Dermatologist');
+  if (/\bcardio|heart|chest pain|angina|palpitation|arrhythmia|murmur|hypertension|blood pressure\b/.test(t)) picks.add('Cardiology');
+  if (/\blung|pulmo|breath(ing)?|shortness of breath|sob|wheeze|asthma|copd|pneumonia|cough|pleur|emphysema\b/.test(t)) picks.add('Pulmonology');
+  if (/\bgastro|stomach|abdomen|abdominal|belly|gastric|acid reflux|gerd|ulcer|diarrhea|constipation|vomit|nausea|ibs|bloating|indigestion\b/.test(t)) picks.add('Gastroenterologist');
+  if (/\bliver|hepat|jaundice|cirrhosis|fatty liver|hepatitis|biliary|gallbladder|cholecyst|\bascites\b/.test(t)) picks.add('Hepatology');
+  if (/\bkidney|renal\b/.test(t)) picks.add('Nephrology');
+  if (/\b(kidney|urinary|ureter|bladder|stone|uti|u(t|r)inary tract|prostate|testicular|erectile|penile|scrotal|varicocele|nocturia)\b/.test(t)) picks.add('Urology');
+  if (/\bendocrin|hormone|thyroid|goiter|hyperthy|hypothy|diabet(es|ic)|insulin|pituitar(y)?|adrenal|pcos\b/.test(t)) picks.add('Endocrinology, Diabetes & Metabolism');
+  if (/\brheumat|autoimmune|arthritis|gout|lupus|scleroderma|sjogren|vasculitis|ankylosing|psoriatic\b/.test(t)) picks.add('Rheumatology');
+  if (/\binfect(ion)?|fever of unknown|hiv|aids|tb|malaria|typhoid|hepatitis\b/.test(t)) picks.add('Infectious Diseases');
+  if (/\bblood|anemi(a)?|hemoglobin|clot|dvt|bleeding disorder|thrombo|platelet|hemophilia|sickle\b/.test(t)) picks.add('Hematology');
+  if (/\bcancer|tumou?r|oncolog|mass|lump|metastasis|chemo(therapy)?\b/.test(t)) picks.add('Medical Oncology');
+  if (/\ballerg(y|ies)?|immunolog|sneeze|hay fever|rhinitis|anaphylaxis|urticaria\b/.test(t)) picks.add('Allergy & Immunology');
+  if (/\bneuro|brain|seiz(ure)?|epilep|stroke|tia|weakness|numb|tingl|parkinson|tremor|memory|dementia|migraine|headache|neuropath(y)?\b/.test(t)) picks.add('Neurologist');
+  if (/\bpsychiat|mental|depress|anxiety|panic|bipolar|schizo|adhd|ocd|ptsd|addiction (treatment|help)?\b/.test(t)) picks.add('Psychiatry');
+  if (/\baddiction|substance|alcohol(ism)?|opioid|drug (use|dependence)\b/.test(t)) picks.add('Addiction Medicine');
+  if (/\bobgyn|gyne|gyn|pregnan|antenatal|postnatal|pelvic pain|pcos|fibroid|period|menstrual|menopause|uter(ine)?|ovary|cervix|vaginal\b/.test(t)) picks.add('Gynecologist');
+  if (/\bpediatr(ic|ician|ics)|child|kid|toddler|infant|newborn|neonat(al|ology)?\b/.test(t)) picks.add('Pediatricians');
+  if (/\bgeriatr(ic|ics)|elder(ly)?|senior|older adult\b/.test(t)) picks.add('Geriatric Medicine');
+  if (/\bemergency|er|trauma|accident|urgent|laceration|acute distress|severe pain|fainted|unconscious\b/.test(t)) picks.add('Emergency Medicine');
+  if (/\bcritical care|icu|ventilator|shock|sepsis\b/.test(t)) picks.add('Critical Care Medicine');
+  if (/\banesthes(io|ia)|anesthetist|pain block\b/.test(t)) picks.add('Anesthesiology');
+  if (/\bgeneral (surgery|surgeon)|append(ici)?tis|hernia|lump removal|biopsy|abscess drainage|gallbladder surgery|pilonoidal\b/.test(t)) picks.add('General Surgery');
+  if (/\bcardiothoracic|heart surgery|bypass|cabg|valve\b/.test(t)) picks.add('Cardiothoracic Surgery');
+  if (/\bvascular (surg|surgeon)?|peripheral artery|pad|claudication|aneurysm|carotid|varicose vein(s)?\b/.test(t)) picks.add('Vascular Surgery');
+  if (/\bneurosurg(ery|eon)|brain surgery|spinal tumor\b/.test(t)) picks.add('Neurosurgery');
+  if (/\borthopedic|orthopaedic|bone(s)?|fracture|sprain|ligament|tendon|rotator cuff|meniscus|dislocation|joint replacement\b/.test(t)) picks.add('Orthopedic Surgery');
+  if (/\bsports (med|medicine)|sports injur(y|ies)|acl|mcl|tennis elbow|runner'?s knee|shin splints\b/.test(t)) picks.add('Sports Medicine');
+  if (/\bent\b|\bear(ache| infection)?|hearing|tinnitus|nose|sinus(it|itis)|throat|tonsil|adenoid|hoarse|voice|snoring\b/.test(t)) picks.add('Otolaryngology (ENT)');
+  if (/\bophthal|eye|vision|blurred vision|red eye|conjunctivitis|glaucoma|cataract|retina\b/.test(t)) picks.add('Ophthalmology');
+  if (/\bplastic (and )?reconstruct(ive)?|cosmetic surgery|burn reconstruction|scar revision\b/.test(t)) picks.add('Plastic & Reconstructive Surgery');
+  if (/\bhand (surgery|surgeon)?|carpal tunnel|trigger finger|hand tendon|dupuytren\b/.test(t)) picks.add('Hand Surgery');
+  if (/\bspine (surgery|surgeon)?|sciatica (surgery)?|spinal stenosis\b/.test(t)) picks.add('Spine Surgery');
+  if (/\bbreast lump|nipple discharge|mastectomy|lumpectomy|breast surgery\b/.test(t)) picks.add('Breast Surgery');
+  if (/\bbariatric|weight loss surgery|gastric (bypass|sleeve)|obesity surgery\b/.test(t)) picks.add('Bariatric & Metabolic Surgery');
+  if (/\bcolorectal|rectal|anal fissure|fistula|hemorrhoid|rectal bleeding|pilonidal\b/.test(t)) picks.add('Colorectal Surgery');
+  if (/\btransplant (surgery|evaluation)|kidney transplant|liver transplant\b/.test(t)) picks.add('Transplant Surgery');
+  if (/\bendocrine surgery|thyroid nodule surgery|parathyroid|adrenalectomy\b/.test(t)) picks.add('Endocrine Surgery');
+  if (/\bpediatric (surgery|surgeon)\b/.test(t)) picks.add('Pediatric Surgery');
+  if (/\bradiology|x-?ray|ct scan|mri|ultrasound (result)?\b/.test(t)) picks.add('Diagnostic Radiology');
+  if (/\binterventional radiology|embolization|angioplasty|stent (placement)?\b/.test(t)) picks.add('Interventional Radiology');
+  if (/\bradiation oncology|radiotherapy|brachytherapy\b/.test(t)) picks.add('Radiation Oncology');
+  if (/\bnuclear medicine|pet[- ]?scan|thyroid uptake\b/.test(t)) picks.add('Nuclear Medicine');
+  if (/\bpathology|biopsy report|histopathology\b/.test(t)) picks.add('Anatomic Pathology');
+  if (/\bclinical pathology|lab medicine|coagulation workup\b/.test(t)) picks.add('Clinical Pathology (Laboratory Medicine)');
+  if (/\bforensic (pathology|examiner)\b/.test(t)) picks.add('Forensic Pathology');
+  if (/\bpm&r|physiatry|rehabilitation|stroke rehab|spinal cord injury|prosthetic\b/.test(t)) picks.add('Physical Medicine & Rehabilitation (PM&R)');
+  if (/\bpain (clinic|medicine)|chronic pain|nerve pain|neuropathic pain\b/.test(t)) picks.add('Pain Medicine');
+  if (/\bsleep (apnea|medicine)|insomnia|snor(ing|e)\b/.test(t)) picks.add('Sleep Medicine');
+  if (/\boccupational (medicine|health)|work injury|industrial exposure\b/.test(t)) picks.add('Occupational & Environmental Medicine');
+  if (/\bpalliative|hospice|end-of-life|comfort care\b/.test(t)) picks.add('Palliative Care / Hospice Medicine');
+  if (/\bwound care|chronic ulcer|diabetic foot|pressure sore|bed sore\b/.test(t)) picks.add('Wound Care');
+  if (/\bphlebology|vein clinic|varicose|spider veins\b/.test(t)) picks.add('Phlebology (Vein Medicine)');
+  if (/\bclinical nutrition|diet counsel|malnutrition|tube feed|tpn|obesity (management)?\b/.test(t)) picks.add('Clinical Nutrition');
+  if (/\bmen'?s health|andrology|erectile dysfunction|male infertility\b/.test(t)) picks.add('Men’s Health / Andrology');
+  if (/\bwomen'?s health|pap smear|well woman exam\b/.test(t)) picks.add('Women’s Health');
+  if (/\btravel (clinic|medicine)|travel vaccine|malaria prophylaxis|yellow fever\b/.test(t)) picks.add('Travel & Tropical Medicine');
+  if (/\bmedical genetics|genomic(s)?|inherited disorder\b/.test(t)) picks.add('Medical Genetics & Genomics');
+  if (/\bclinical informatics|ehr|interoperability\b/.test(t)) picks.add('Clinical Informatics');
+  if (/\bhyperbaric (medicine|oxygen)\b/.test(t)) picks.add('Hyperbaric Medicine');
+  if (/\bmedical toxicology|poison(ing)?|overdose|toxin exposure\b/.test(t)) picks.add('Medical Toxicology');
+  if (/\bwilderness medicine|altitude sickness|frostbite|hypothermia\b/.test(t)) picks.add('Wilderness Medicine');
+  if (/\bgeriatr(ic|ics) psychiatry|late-life depression|memory care\b/.test(t)) picks.add('Geriatric Psychiatry');
+  if (/\bchild(ren)? (and )?adolescent psychiatry|adolescent mental health\b/.test(t)) picks.add('Child & Adolescent Psychiatry');
+  if (/\bbehavioral neurology|neuropsychiatry\b/.test(t)) picks.add('Behavioral Neurology & Neuropsychiatry');
+  if (/\bneurocritical care|icu neuro|intracranial pressure\b/.test(t)) picks.add('Neurocritical Care');
+  if (/\baesthetic|cosmetic (medicine|injectable)|botox|filler\b/.test(t)) picks.add('Aesthetic Medicine');
 
   // trauma / MSK
   if (/(fall|accident|injur|fractur|sprain|bruise|swollen|swelling|limited movement|joint|knee|ankle|wrist|shoulder)/.test(t)) {
@@ -341,8 +280,6 @@ async function queryDoctorsByName({ name, gender, pricePref, expMin, wantBest })
   return docs;
 }
 
-// ...imports and helpers unchanged from your last version...
-
 const SYSTEM_PROMPT = `
 You are "Pandoc Health Assistant" for the Pandoc HMS.
 
@@ -357,7 +294,6 @@ STYLE
 - Use full history; don't repeat prior questions. Ask at most ONE focused follow-up only if truly needed.
 - Do not use filler like “please hold on”, “one moment”, or similar.
 - Never say you can't recall previous messages; you do have the chat context.
-
 
 INTENT & PREFERENCES
 - If user explicitly asks to see doctors or books, set "intent":"show_doctors".
@@ -391,9 +327,17 @@ router.post('/chat', async (req, res) => {
   try {
     const { messages = [] } = req.body;
     const latestUser = [...messages].reverse().find(m => m.role === 'user')?.content || '';
-    const forceShow = lastUserWantsDoctors(latestUser);
+    let forceShow = lastUserWantsDoctors(latestUser);
     const doneFeeling = userSeemsDone(latestUser);
     const convo = conversationText(messages);
+
+    // NEW: “Yes” immediately after an offer counts as force-show.
+    const prevAssistant = [...messages].reverse().find(m => m.role === 'assistant')?.content || '';
+    const userSaidYes = /\b(yes|yeah|yep|sure|ok|okay|please)\b/i.test(latestUser);
+    const prevOffered = /show (relevant|suitable) doctors/i.test(prevAssistant);
+    if (!forceShow && userSaidYes && prevOffered) {
+      forceShow = true;
+    }
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -427,29 +371,27 @@ router.post('/chat', async (req, res) => {
       const mentioned = await findMentionedSpecialtiesInText(latestUser);
       if (mentioned.length) directSpecs = mentioned;
     }
-   // If assistant is asking a clarifying question, do NOT show doctors…
-// …UNLESS the user explicitly asked to see doctors (forceShow).
-const askingNow =
-  /\?\s*$/.test((assistant_message || '').trim()) ||
-  /specif(y|ic)/i.test(assistant_message || '');
 
-if (askingNow && !forceShow) {
-  return res.json({
-    success: true,
-    reply: assistant_message,
-    intent: 'request_more_info',
-    doctors: []
-  });
-}
+    // If assistant is asking a clarifying question, do NOT show doctors…
+    // …UNLESS the user explicitly asked to see doctors (forceShow).
+    const askingNow =
+      /\?\s*$/.test((assistant_message || '').trim()) ||
+      /specif(y|ic)/i.test(assistant_message || '');
 
+    if (askingNow && !forceShow) {
+      return res.json({
+        success: true,
+        reply: assistant_message,
+        intent: 'request_more_info',
+        doctors: []
+      });
+    }
 
-   
-    // ---- NEW GATE: do not auto-show doctors unless explicitly asked or direct target given ----
+    // Do not auto-show unless explicitly asked or direct target given
     const explicitAskOrDirect = forceShow || !!directName || (directSpecs && directSpecs.length > 0);
     if (intent === 'show_doctors' && !explicitAskOrDirect) {
       intent = 'chat';
-      if (!/show relevant doctors/i.test(assistant_message)) {
-        // turn this into an offer rather than showing links
+      if (!/show (relevant|suitable) doctors/i.test(assistant_message)) {
         assistant_message = `${assistant_message} Want me to show suitable doctors here?`;
       }
     }
@@ -514,23 +456,19 @@ if (askingNow && !forceShow) {
       }
     }
 
-    // In your section:
-// if (!doctors.length && intent === 'show_doctors') { ... }
+    // Final broad fallback: show any available doctors (no questions) when user explicitly asked
+    if (!doctors.length && intent === 'show_doctors' && forceShow) {
+      doctors = await doctorModel
+        .find({ available: true })
+        .select('_id name speciality fees experience degree image address gender')
+        .sort({ date: -1 })
+        .limit(12)
+        .lean();
 
-if (!doctors.length && intent === 'show_doctors' && forceShow) {
-  // final broad fallback: show any available doctors (no questions)
-  doctors = await doctorModel
-    .find({ available: true })
-    .select('_id name speciality fees experience degree image address gender')
-    .sort({ date: -1 })
-    .limit(12)
-    .lean();
-
-  assistant_message = doctors.length
-    ? "Here are available doctors."
-    : "No doctors are available right now.";
-}
-
+      assistant_message = doctors.length
+        ? "Here are available doctors."
+        : "No doctors are available right now.";
+    }
 
     return res.json({ success: true, reply: assistant_message, intent, doctors });
   } catch (e) {
@@ -538,6 +476,5 @@ if (!doctors.length && intent === 'show_doctors' && forceShow) {
     return res.status(500).json({ success: false, message: 'AI service error' });
   }
 });
-
 
 export default router;
