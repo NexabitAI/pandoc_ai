@@ -1,17 +1,19 @@
 // utils/ctxStore.js
-import Redis from 'ioredis';
+import 'dotenv/config.js';
 
-const hasRedis = !!process.env.REDIS_URL;
+let mem = new Map();
 let redis = null;
-if (hasRedis) {
-  redis = new Redis(process.env.REDIS_URL, { lazyConnect: true });
-  try { await redis.connect(); } catch { /* ignore connect now; will auto-connect */ }
+
+const TTL_SEC = parseInt(process.env.CHAT_CTX_TTL_SEC || '172800', 10);
+
+if (process.env.REDIS_URL) {
+  const Redis = (await import('ioredis')).default;
+  redis = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 2 });
 }
 
-const mem = new Map(); // fallback
+const key = (tenantId, userId, chatId) => `pandoc:ctx:${tenantId}:${userId}:${chatId}`;
 
-const k = (tenantId, userId, chatId) => `pandoc:ctx:${tenantId || 'default'}:${userId || 'anon'}:${chatId || 'local'}`;
-const DEFAULT_CTX = () => ({
+const DEFAULT = () => ({
   lastSpecialty: null,
   filters: {},
   lastList: [],
@@ -20,24 +22,29 @@ const DEFAULT_CTX = () => ({
   language: 'en',
   messages: []
 });
-const TTL_SEC = parseInt(process.env.CHAT_CTX_TTL_SEC || '172800', 10); // 48h
 
-export async function getCtx(tenantId, userId, chatId) {
-  const key = k(tenantId, userId, chatId);
-  if (hasRedis) {
-    const raw = await redis.get(key);
-    return raw ? JSON.parse(raw) : DEFAULT_CTX();
+export async function getCtx(tenantId='default', userId='anon', chatId='local') {
+  const k = key(tenantId, userId, chatId);
+  if (redis) {
+    const raw = await redis.get(k);
+    return raw ? JSON.parse(raw) : DEFAULT();
   }
-  const row = mem.get(key);
-  if (!row || (row.expiresAt && Date.now() > row.expiresAt)) return DEFAULT_CTX();
-  return row.ctx;
+  return mem.get(k) || DEFAULT();
 }
 
-export async function saveCtx(tenantId, userId, chatId, ctx, ttlSec = TTL_SEC) {
-  const key = k(tenantId, userId, chatId);
-  if (hasRedis) {
-    await redis.set(key, JSON.stringify(ctx), 'EX', ttlSec);
+export async function saveCtx(tenantId='default', userId='anon', chatId='local', ctx) {
+  const k = key(tenantId, userId, chatId);
+  if (redis) {
+    await redis.set(k, JSON.stringify(ctx), 'EX', TTL_SEC);
     return;
   }
-  mem.set(key, { ctx, expiresAt: Date.now() + ttlSec * 1000 });
+  mem.set(k, ctx);
+  // crude TTL cleanup
+  setTimeout(()=> mem.delete(k), TTL_SEC*1000).unref?.();
+}
+
+export async function clearCtx(tenantId='default', userId='anon', chatId='local') {
+  const k = key(tenantId, userId, chatId);
+  if (redis) return redis.del(k);
+  mem.delete(k);
 }
