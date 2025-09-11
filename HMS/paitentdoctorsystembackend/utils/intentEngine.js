@@ -12,29 +12,33 @@ export const stripYears = (val) => {
   return m ? Number(m[1]) : 0;
 };
 
-/** One-line, empathetic summary. Uses OpenAI if available, else a safe fallback. */
-export async function summarizeEmpathetic(openai, raw) {
+/** One-line, empathetic summary (non-diagnostic). */
+export async function summarizeEmpathetic(openaiClient, raw) {
   const txt = String(raw || '').trim();
   const fallback = txt
     ? `That sounds concerning. From what you shared: ${txt}.`
     : `That sounds concerning.`;
 
-  // Try OpenAI if wired; always fail safe to fallback
   try {
-    if (openai?.responses?.create) {
-      const r = await openai.responses.create({
-        model: process.env.SUMMARY_MODEL || 'gpt-4o-mini',
-        input:
-          `In ONE supportive line (<=18 words), summarize the patient's concern without diagnosing, avoid commands:\n` +
-          txt
+    if (openaiClient?.chat?.completions?.create) {
+      const r = await openaiClient.chat.completions.create({
+        model: process.env.SUMMARY_MODEL || process.env.INTENT_MODEL || 'gpt-4o',
+        messages: [
+          { role: 'system',
+            content:
+              'Reply in ONE supportive sentence (<=18 words). No diagnosis, no commands, no treatment.' },
+          { role: 'user', content: txt || 'No details.' }
+        ],
+        temperature: 0.3
       });
-      const out = r?.output_text?.trim();
+      const out = r?.choices?.[0]?.message?.content?.trim();
       if (out) return out;
     }
-  } catch (_e) { /* ignore and use fallback */ }
+  } catch (_) { /* ignore */ }
 
   return fallback;
 }
+
 
 /* ---------------- Intent parsing (more permissive) ---------------- */
 

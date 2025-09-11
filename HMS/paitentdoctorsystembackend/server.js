@@ -8,7 +8,6 @@ import doctorRouter from "./routes/doctorRoute.js"
 import adminRouter from "./routes/adminRoute.js"
 import getSpecialityRoute from "./routes/getSpeciality.js";
 import specialtiesRouter from './routes/specialties.js';
-import aiChatRouter from './routes/aiChat.js';
 import aiChatRAG from './routes/aiChatRAG.js'; 
 
 // app config
