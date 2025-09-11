@@ -1,5 +1,6 @@
 // utils/ctxStore.js
 import 'dotenv/config'; // no .js
+console.log('[ctxStore] module loaded:', new Date().toISOString());
 
 const TTL_SEC = parseInt(process.env.CHAT_CTX_TTL_SEC || '172800', 10); // 2 days
 const mem = new Map();         // key -> ctx
