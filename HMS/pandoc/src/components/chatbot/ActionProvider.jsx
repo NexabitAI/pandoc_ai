@@ -13,6 +13,10 @@ class ActionProvider {
     this.doctors = [];
     this.selectedDoctor = null;
     this.offerPending = false;
+
+    // NEW: remember last specialty context
+    this.lastSpecialties = [];
+    this.lastSpecialty = null;
   }
 
   updateChatbotState(message) {
@@ -30,7 +34,6 @@ class ActionProvider {
     this._push('assistant', msg.message);
   }
 
-  // CHANGED: no doctor mention here
   greet() {
     const msg = this.createChatBotMessage("Hi — how can I help today? Tell me what happened.");
     this.updateChatbotState(msg);
@@ -45,7 +48,7 @@ class ActionProvider {
 
   suggestDoctorsFromContext() {
     this.offerPending = true;
-    const msg = this.createChatBotMessage("Got it. Would you like me to show relevant doctors now?");
+    const msg = this.createChatBotMessage("Got it. Would you like me to show suitable doctors now?");
     this.updateChatbotState(msg);
     this._push('assistant', msg.message);
   }
@@ -53,6 +56,34 @@ class ActionProvider {
   _years(s = '') {
     const n = parseInt(String(s).match(/\d+/)?.[0] || '0', 10);
     return Number.isNaN(n) ? 0 : n;
+  }
+
+  // NEW: remember last specialty set + most frequent specialty
+  _rememberSpecialtiesFrom(doctors = []) {
+    const specs = doctors.map(d => (d.speciality || '').trim()).filter(Boolean);
+    this.lastSpecialties = Array.from(new Set(specs));
+    if (specs.length) {
+      const freq = specs.reduce((m, s) => (m[s] = (m[s] || 0) + 1, m), {});
+      this.lastSpecialty = Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
+    } else {
+      this.lastSpecialty = null;
+    }
+    // optional persistence:
+    try {
+      localStorage.setItem('lastSpecialty', this.lastSpecialty || '');
+      localStorage.setItem('lastSpecialties', JSON.stringify(this.lastSpecialties));
+    } catch {}
+  }
+
+  // NEW: expose last specialty to parser
+  getLastSpecialty() {
+    if (this.lastSpecialty) return this.lastSpecialty;
+    try {
+      const cached = localStorage.getItem('lastSpecialty');
+      return cached || null;
+    } catch {
+      return null;
+    }
   }
 
   // comparison across the currently listed doctors
@@ -102,11 +133,15 @@ class ActionProvider {
       this.updateChatbotState(botMsg);
       this._push('assistant', reply);
 
+      // broaden to "relevant" or "suitable"
       this.offerPending = /show (relevant|suitable) doctors/i.test(reply);
 
       if (intent === 'show_doctors' && doctors.length) {
         this.doctors = doctors;
-        localStorage.setItem('doctors', JSON.stringify(doctors));
+        // NEW: remember context specialties from the shown list
+        this._rememberSpecialtiesFrom(doctors);
+
+        try { localStorage.setItem('doctors', JSON.stringify(doctors)); } catch {}
         this.setState(prev => ({ ...prev, doctors, selectedDoctor: null }));
 
         const listMsg = this.createChatBotMessage(
