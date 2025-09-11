@@ -11,31 +11,29 @@ const FALLBACK_SPECIALTIES = [
   'Gastroenterologist'
 ];
 
-const MIN_CARD_WIDTH_PX = 240;      // used to estimate columns for 2-rows pagination
-const SPECS_PER_VIEW = 8;           // how many specialties to show at once in the vertical carousel
+// how many specialties to show at once in the vertical carousel
+const SPECS_PER_VIEW = 5;
 
 const Doctors = () => {
-
   const { speciality } = useParams()
 
   const [filterDoc, setFilterDoc] = useState([])
   const [showFilter, setShowFilter] = useState(false)
   const navigate = useNavigate();
 
-  // fetch doctors as before + get backendUrl for specialties endpoint
   const { doctors, backendUrl } = useContext(AppContext)
 
-  // dynamic specialties
+  // specialties from backend
   const [specialties, setSpecialties] = useState([])
   const [loadingSpecs, setLoadingSpecs] = useState(true)
 
-  // vertical carousel window start index
+  // carousel window start index
   const [specStart, setSpecStart] = useState(0)
 
-  // grid sizing to paginate by rows
+  // grid + pagination (exact full rows)
   const gridRef = useRef(null)
-  const [cols, setCols] = useState(1)      // estimated columns in the grid
-  const [rowsToShow, setRowsToShow] = useState(2) // start with 2 rows
+  const [cols, setCols] = useState(1)          // detected columns in grid
+  const [rowsToShow, setRowsToShow] = useState(2) // start with 2 FULL rows
 
   const applyFilter = () => {
     if (speciality) {
@@ -69,22 +67,38 @@ const Doctors = () => {
     return () => { isMounted = false }
   }, [backendUrl])
 
-  // observe grid width → estimate columns so we can show N rows initially
+  // detect actual number of grid columns so we can slice by full rows exactly
   useEffect(() => {
     if (!gridRef.current) return
     const el = gridRef.current
+
     const measure = () => {
-      const w = el.clientWidth || 1
-      const c = Math.max(1, Math.floor(w / MIN_CARD_WIDTH_PX))
-      setCols(c)
+      // Try to read computed grid template columns (most reliable)
+      const gtc = getComputedStyle(el).gridTemplateColumns
+      let count = 0
+      if (gtc && gtc !== 'none') {
+        count = gtc.split(' ').length
+      }
+
+      // Fallback: estimate from width if template is 'none'
+      if (!count) {
+        const w = el.clientWidth || 1
+        // conservative min card width; tweak if needed
+        const estimated = Math.max(1, Math.floor(w / 280))
+        count = estimated
+      }
+
+      setCols(count)
     }
+
+    // initial + on resize
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
 
-  // vertical carousel helpers
+  // specialties carousel helpers
   const listForFilter = (specialties.length ? specialties : FALLBACK_SPECIALTIES)
   const totalSpecs = listForFilter.length
   const showArrows = totalSpecs > SPECS_PER_VIEW
@@ -101,14 +115,13 @@ const Doctors = () => {
     if (!showArrows) return
     setSpecStart((prev) => (prev + SPECS_PER_VIEW) % totalSpecs)
   }
-
   const prevSpecs = () => {
     if (!showArrows) return
     setSpecStart((prev) => (prev - SPECS_PER_VIEW + totalSpecs) % totalSpecs)
   }
 
-  // docs pagination by rows
-  const visibleCount = cols * rowsToShow
+  // docs pagination by FULL rows
+  const visibleCount = Math.min(filterDoc.length, cols * rowsToShow)
   const visibleDocs = filterDoc.slice(0, visibleCount)
   const canLoadMore = visibleCount < filterDoc.length
 
@@ -124,10 +137,10 @@ const Doctors = () => {
           Filters
         </button>
 
-        {/* Vertical carousel filter */}
+        {/* Vertical carousel filter (arrows ABOVE and BELOW the list) */}
         <div className={`flex-col gap-2 text-sm text-gray-600 ${showFilter ? 'flex' : 'hidden sm:flex'}`}>
 
-          {/* "All" stays outside carousel */}
+          {/* All Specialties (always visible) */}
           <p
             onClick={() => navigate('/doctors')}
             className={`w-[94vw] sm:w-56 pl-3 py-1.5 pr-4 border border-gray-300 rounded transition-all cursor-pointer ${!speciality ? 'bg-[#E2E5FF] text-black ' : ''}`}
@@ -135,24 +148,15 @@ const Doctors = () => {
             All Specialties
           </p>
 
-          {/* Controls */}
+          {/* Top arrow */}
           {showArrows && (
-            <div className="flex flex-col items-stretch gap-2">
-              <button
-                onClick={prevSpecs}
-                className="border border-gray-300 rounded px-3 py-1 hover:bg-gray-50"
-                aria-label="Previous specialties"
-              >
-                ▲
-              </button>
-              <button
-                onClick={nextSpecs}
-                className="border border-gray-300 rounded px-3 py-1 hover:bg-gray-50"
-                aria-label="Next specialties"
-              >
-                ▼
-              </button>
-            </div>
+            <button
+              onClick={prevSpecs}
+              className="w-[94vw] sm:w-56 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50"
+              aria-label="Previous specialties"
+            >
+              ▲
+            </button>
           )}
 
           {/* Window of specialties */}
@@ -168,6 +172,17 @@ const Doctors = () => {
               </p>
             ))}
           </div>
+
+          {/* Bottom arrow */}
+          {showArrows && (
+            <button
+              onClick={nextSpecs}
+              className="w-[94vw] sm:w-56 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50"
+              aria-label="Next specialties"
+            >
+              ▼
+            </button>
+          )}
 
           {loadingSpecs && specialties.length === 0 && (
             <span className='text-xs text-gray-500 mt-1'>Loading specialties…</span>
@@ -196,7 +211,7 @@ const Doctors = () => {
             ))}
           </div>
 
-          {/* Load more */}
+          {/* Load more (adds exactly one FULL row each click) */}
           {canLoadMore && (
             <div className='flex justify-center mt-6'>
               <button
