@@ -399,7 +399,18 @@ router.post('/chat', async (req, res) => {
     const expMin = (typeof min_experience_years === 'number' ? min_experience_years : null) || heur.expMin || null;
     const wantBest = (typeof want_best === 'boolean' ? want_best : null) || heur.wantBest || null;
     const pricePref = price || heur.pricePref || null;
+const askingNow =
+  /\?\s*$/.test((assistant_message || '').trim()) ||  // ends with a question mark
+  /specif(y|ic)/i.test(assistant_message || '');      // contains "specify/specific"
 
+if (askingNow) {
+  return res.json({
+    success: true,
+    reply: assistant_message,
+    intent: 'request_more_info',   // ask-only turn
+    doctors: []                    // <-- critical: no profiles in this turn
+  });
+}
     if (!directName) {
       const n = guessDoctorNameFromText(latestUser);
       if (n) directName = n;
@@ -408,12 +419,9 @@ router.post('/chat', async (req, res) => {
       const mentioned = await findMentionedSpecialtiesInText(latestUser);
       if (mentioned.length) directSpecs = mentioned;
     }
-   // If the assistant is clearly asking a clarifying question, do NOT show doctors in this turn.
-   const askingNow = /\?\s*$/.test(assistant_message.trim()) || /specif(y|ic)/i.test(assistant_message);
-   if (askingNow && !directName && !(directSpecs && directSpecs.length)) {
-     // Force this to a pure "ask" turn; suppress auto show even if "doctor" was mentioned.
-     intent = 'request_more_info';
-   }
+
+
+   
     // ---- NEW GATE: do not auto-show doctors unless explicitly asked or direct target given ----
     const explicitAskOrDirect = forceShow || !!directName || (directSpecs && directSpecs.length > 0);
     if (intent === 'show_doctors' && !explicitAskOrDirect) {
