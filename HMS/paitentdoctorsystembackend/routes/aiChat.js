@@ -16,36 +16,39 @@ function conversationText(messages=[]) {
   return messages.map(m => `${m.role}: ${m.content}`).join('\n');
 }
 
+/** EXPANDED: treat many “show/give me … doctor(s)” phrasings, incl. adjectives like “suitable/relevant/any/nearby”. */
 function lastUserWantsDoctors(txt = '') {
   const t = String(txt).toLowerCase().replace(/\s+/g, ' ').trim();
 
-  // Keep it simple: a small set of normal regexes checked in order.
   const patterns = [
-    /\bshow (relevant|suitable)\s*doctor(s)?\b/,
-    /\bplease show (me )?(a|the)?\s*doctor(s)?\b/,
-    /\bshow me (a|the)?\s*doctor(s)?\b/,
-    /\bgive me (a|the)?\s*doctor(s)?\b/,
-    /\bsend me (a|the)?\s*doctor(s)?\b/,
-    /\bfind (me )?(a|the)?\s*doctor(s)?\b/,
-    /\b(i )?need (a|the)?\s*doctor(s)?\b/,
-    /\bbook (a|the)?\s*doctor\b/,
-    /\bdoctor please\b/,
+    // explicit “show/give/send/provide/list/share/find/get/book … doctor(s)”
+    /\b(show|give|send|provide|list|share|find|get|book)\s+(me\s+)?((a|the)\s+)?(suitable|relevant|nearby|any)?\s*doctor(s)?\b/,
+    // “doctor please / any doctor”
+    /\bdoctor(s)?\s*(please|now)\b/,
     /\bany doctor(s)?\b/,
-    /\bjust show (me )?(a|the)?\s*doctor(s)?\b/,
-    /\bshow the doctor(s)?\b/,
+    // “show doctors / show me”
     /\bshow doctor(s)?\b/,
     /\bshow doctors\b/,
-    // last on purpose; broadest one:
-    /\bshow me\b/
+    /\bshow me\b/,
+    // “just show me … doctor(s)”
+    /\bjust show (me )?((a|the)\s+)?(suitable|relevant|nearby|any)?\s*doctor(s)?\b/,
+    // “give me … doctors” allowing adjectives in between
+    /\bgive me (suitable|relevant|nearby|any)?\s*doctor(s)?\b/,
+    // “doctor(s) for …”
+    /\bdoctor(s)?\s+for\b/
   ];
 
-  return patterns.some((rx) => rx.test(t));
+  // also: “yes/ok/please … doctor(s)” as a direct show signal
+  const yesWithDoctors = /\b(yes|yeah|yep|ok|okay|sure|please)\b.*\bdoctor(s)?\b/.test(t);
+
+  return yesWithDoctors || patterns.some(rx => rx.test(t));
 }
 
 function userSeemsDone(txt='') {
   const t = txt.toLowerCase();
   return /\b(that'?s all|nothing more|no other|nothing else|that is it|that'?s it)\b/.test(t);
 }
+
 function extractHeuristicPrefs(txt='') {
   const t = txt.toLowerCase();
   let gender = null;
@@ -90,7 +93,6 @@ async function findMentionedSpecialtiesInText(txt='') {
     const name = (s.name || '').toLowerCase();
     if (name && t.includes(name)) found.add(s.name);
   }
-  // synonyms / keywords
   if (/\bdermatolog(y|ist)|skin\b/i.test(txt)) found.add('Dermatologist');
   if (/\bcardiolog(y|ist)|chest pain|heart\b/i.test(txt)) found.add('Cardiology');
   if (/\bneurolog(y|ist)|nerv|seiz|stroke|head injur(y)?|headache\b/i.test(txt)) found.add('Neurologist');
@@ -122,9 +124,7 @@ function fallbackSpecialtiesFromText(text='') {
   if (/\bpedia|child|kid\b/.test(t)) picks.add('Pediatricians');
   if (/\bendocrin|thyroid|diabet\b/.test(t)) picks.add('Endocrinology, Diabetes & Metabolism');
   if (/\bbone(s)?\b|orthopedic|orthopaedic/.test(t)) picks.add('Orthopedic Surgery');
-
-  // Extended coverage
-  if (/\bdermat(o|ology|ologist)|skin|rash|acne|eczema|psoriasis|hives|itch|alopecia|hair loss|nail|fungus\b/.test(t)) picks.add('Dermatologist');
+   if (/\bdermat(o|ology|ologist)|skin|rash|acne|eczema|psoriasis|hives|itch|alopecia|hair loss|nail|fungus\b/.test(t)) picks.add('Dermatologist');
   if (/\bcardio|heart|chest pain|angina|palpitation|arrhythmia|murmur|hypertension|blood pressure\b/.test(t)) picks.add('Cardiology');
   if (/\blung|pulmo|breath(ing)?|shortness of breath|sob|wheeze|asthma|copd|pneumonia|cough|pleur|emphysema\b/.test(t)) picks.add('Pulmonology');
   if (/\bgastro|stomach|abdomen|abdominal|belly|gastric|acid reflux|gerd|ulcer|diarrhea|constipation|vomit|nausea|ibs|bloating|indigestion\b/.test(t)) picks.add('Gastroenterologist');
@@ -192,6 +192,7 @@ function fallbackSpecialtiesFromText(text='') {
   if (/\bneurocritical care|icu neuro|intracranial pressure\b/.test(t)) picks.add('Neurocritical Care');
   if (/\baesthetic|cosmetic (medicine|injectable)|botox|filler\b/.test(t)) picks.add('Aesthetic Medicine');
 
+
   // trauma / MSK
   if (/(fall|accident|injur|fractur|sprain|bruise|swollen|swelling|limited movement|joint|knee|ankle|wrist|shoulder)/.test(t)) {
     picks.add('Orthopedic Surgery'); picks.add('Sports Medicine'); picks.add('Emergency Medicine');
@@ -201,13 +202,11 @@ function fallbackSpecialtiesFromText(text='') {
     picks.add('Emergency Medicine'); picks.add('Wound Care'); picks.add('General Surgery');
   }
 
-  // FINAL fallback: Emergency Medicine (NOT General physician)
   if (picks.size === 0) picks.add('Emergency Medicine');
   return Array.from(picks);
 }
 
 async function queryDoctorsBySpecialties({ specialties, gender, pricePref, expMin, wantBest }) {
-  // If nothing provided, prefer Emergency Medicine
   if (!Array.isArray(specialties) || specialties.length === 0) specialties = ['Emergency Medicine'];
   const or = specialties.map(s => ({ speciality: { $regex: new RegExp(`^${escapeRegex(s)}$`, 'i') } }));
   const query = { available: true, $or: or };
@@ -235,7 +234,7 @@ async function queryDoctorsBySpecialties({ specialties, gender, pricePref, expMi
     docs.sort((a, b) => (a.speciality || '').localeCompare(b.speciality || '') || (a.name||'').localeCompare(b.name||''));
   }
 
-  return docs; // return ALL matches
+  return docs;
 }
 
 async function queryDoctorsByName({ name, gender, pricePref, expMin, wantBest }) {
@@ -266,7 +265,6 @@ async function queryDoctorsByName({ name, gender, pricePref, expMin, wantBest })
     docs.sort((a, b) => (a.speciality || '').localeCompare(b.speciality || '') || (a.name||'').localeCompare(b.name||''));
   }
 
-  // Loose contains fallback for "closest one"
   if (docs.length === 0) {
     const loose = new RegExp(escapeRegex(String(name).trim()), 'i');
     const altQuery = { available: true, name: loose };
@@ -331,7 +329,7 @@ router.post('/chat', async (req, res) => {
     const doneFeeling = userSeemsDone(latestUser);
     const convo = conversationText(messages);
 
-    // NEW: “Yes” immediately after an offer counts as force-show.
+    // If previous assistant OFFERED to show docs, a simple “yes/ok/please” counts as forceShow.
     const prevAssistant = [...messages].reverse().find(m => m.role === 'assistant')?.content || '';
     const userSaidYes = /\b(yes|yeah|yep|sure|ok|okay|please)\b/i.test(latestUser);
     const prevOffered = /show (relevant|suitable) doctors/i.test(prevAssistant);
@@ -357,6 +355,7 @@ router.post('/chat', async (req, res) => {
     let directName = direct.doctor_name || null;
     let directSpecs = Array.isArray(direct.specialties) ? direct.specialties : null;
 
+    // Heuristics
     const heur = extractHeuristicPrefs(latestUser);
     gender = gender || heur.gender;
     const expMin = (typeof min_experience_years === 'number' ? min_experience_years : null) || heur.expMin || null;
@@ -372,12 +371,10 @@ router.post('/chat', async (req, res) => {
       if (mentioned.length) directSpecs = mentioned;
     }
 
-    // If assistant is asking a clarifying question, do NOT show doctors…
-    // …UNLESS the user explicitly asked to see doctors (forceShow).
+    // If the assistant is asking a question, don't show doctors — unless user clearly asked to see doctors.
     const askingNow =
       /\?\s*$/.test((assistant_message || '').trim()) ||
       /specif(y|ic)/i.test(assistant_message || '');
-
     if (askingNow && !forceShow) {
       return res.json({
         success: true,
@@ -387,7 +384,7 @@ router.post('/chat', async (req, res) => {
       });
     }
 
-    // Do not auto-show unless explicitly asked or direct target given
+    // Don’t auto-show unless explicitly asked or direct target given
     const explicitAskOrDirect = forceShow || !!directName || (directSpecs && directSpecs.length > 0);
     if (intent === 'show_doctors' && !explicitAskOrDirect) {
       intent = 'chat';
@@ -412,7 +409,7 @@ router.post('/chat', async (req, res) => {
 
     let doctors = [];
 
-    // 1) Direct name first
+    // 1) Direct name
     if (directName) {
       intent = 'show_doctors';
       doctors = await queryDoctorsByName({ name: directName, gender, pricePref, expMin, wantBest });
