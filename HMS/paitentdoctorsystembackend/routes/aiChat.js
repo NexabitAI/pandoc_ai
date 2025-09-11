@@ -419,7 +419,12 @@ if (askingNow) {
       const mentioned = await findMentionedSpecialtiesInText(latestUser);
       if (mentioned.length) directSpecs = mentioned;
     }
-
+   // If the assistant is clearly asking a clarifying question, do NOT show doctors in this turn.
+   const askingNoww = /\?\s*$/.test(assistant_message.trim()) || /specif(y|ic)/i.test(assistant_message);
+   if (askingNoww && !directName && !(directSpecs && directSpecs.length)) {
+     // Force this to a pure "ask" turn; suppress auto show even if "doctor" was mentioned.
+     intent = 'request_more_info';
+   }
 
    
     // ---- NEW GATE: do not auto-show doctors unless explicitly asked or direct target given ----
