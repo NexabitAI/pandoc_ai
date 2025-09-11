@@ -336,6 +336,9 @@ STYLE
 - Empathetic and concise: <= 2 short sentences (<= 220 chars).
 - Answer small-talk briefly ("I'm doing well and here to help with your health.").
 - Use full history; don't repeat prior questions. Ask at most ONE focused follow-up only if truly needed.
+- Do not use filler like “please hold on”, “one moment”, or similar.
+- Never say you can't recall previous messages; you do have the chat context.
+
 
 INTENT & PREFERENCES
 - If user explicitly asks to see doctors or books, set "intent":"show_doctors".
@@ -405,7 +408,12 @@ router.post('/chat', async (req, res) => {
       const mentioned = await findMentionedSpecialtiesInText(latestUser);
       if (mentioned.length) directSpecs = mentioned;
     }
-
+   // If the assistant is clearly asking a clarifying question, do NOT show doctors in this turn.
+   const askingNow = /\?\s*$/.test(assistant_message.trim()) || /specif(y|ic)/i.test(assistant_message);
+   if (askingNow && !directName && !(directSpecs && directSpecs.length)) {
+     // Force this to a pure "ask" turn; suppress auto show even if "doctor" was mentioned.
+     intent = 'request_more_info';
+   }
     // ---- NEW GATE: do not auto-show doctors unless explicitly asked or direct target given ----
     const explicitAskOrDirect = forceShow || !!directName || (directSpecs && directSpecs.length > 0);
     if (intent === 'show_doctors' && !explicitAskOrDirect) {

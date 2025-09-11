@@ -102,7 +102,7 @@ class ActionProvider {
       this.updateChatbotState(botMsg);
       this._push('assistant', reply);
 
-      this.offerPending = /show relevant doctors/i.test(reply);
+      this.offerPending = /show (relevant|suitable) doctors/i.test(reply);
 
       if (intent === 'show_doctors' && doctors.length) {
         this.doctors = doctors;
