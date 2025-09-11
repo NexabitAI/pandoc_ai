@@ -9,7 +9,7 @@ const TARGETS = ['sample', 'sample 2'];
 const toExactRegex = (s) => new RegExp(`^${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
 (async () => {
-  if (!process.env.MONGO_URL) {
+  if (!process.env.MONGODB_URI) {
     console.error('Missing MONGO_URL in .env');
     process.exit(1);
   }
