@@ -91,20 +91,26 @@ async function handleChat(req, res) {
   try {
     await ensureIndex(); // idempotent
 
-    const {
-      tenantId = process.env.TENANT_ID || 'default',
-      userId = 'anon',
-      chatId = 'local',
-      message = '',
-    } = req.body || {};
+   const {
+  tenantId = process.env.TENANT_ID || 'default',
+  userId = 'anon',
+  chatId = 'local',
+  message = '',
+  text = ''
+} = req.body || {};
 
-    const raw = String(message || '');
-    const text = norm(raw);
+let raw = '';
+if (typeof message === 'string' && message.trim()) raw = message;
+else if (typeof text === 'string' && text.trim()) raw = text;
+else if (Array.isArray(req.body?.messages) && req.body.messages.length) {
+  const lastUser = [...req.body.messages].reverse().find(m => m.role === 'user')?.content;
+  raw = String(lastUser || '').trim();
+}
+const normText = norm(raw);
 
-    // minimal guard
-    if (!raw.trim()) {
-      return res.json({ success: true, reply: 'Tell me what happened or what you need help with.', doctors: [] });
-    }
+if (!raw) {
+  return res.json({ success: true, reply: 'Tell me what happened or what you need help with.', doctors: [] });
+}
 
     // load ctx
     let ctx = await getCtx(tenantId, userId, chatId);
@@ -382,6 +388,5 @@ async function handleChat(req, res) {
 
 // wire the handler to BOTH paths
 router.post('/ai/chat', handleChat);
-router.post('/chat', handleChat);
 
 export default router;
