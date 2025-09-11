@@ -322,11 +322,14 @@ async function queryDoctorsByName({ name, gender, pricePref, expMin, wantBest })
   return docs;
 }
 
+// ...imports and helpers unchanged from your last version...
+
 const SYSTEM_PROMPT = `
 You are "Pandoc Health Assistant" for the Pandoc HMS.
 
 SCOPE
-- Health/wellness or Pandoc platform only. If outside scope, politely refuse and steer back.
+- Health/wellness or Pandoc platform only.
+- If the question is clearly outside scope, **politely explain the scope and ask one short related question** (e.g., “Any health issue I can help with?”). Do not hard-refuse without a gentle redirect.
 - No diagnosis, meds, dosages, or treatment plans. No external links.
 
 STYLE
@@ -335,11 +338,12 @@ STYLE
 - Use full history; don't repeat prior questions. Ask at most ONE focused follow-up only if truly needed.
 
 INTENT & PREFERENCES
-- If user asks to see doctors/book, "intent":"show_doctors".
+- If user explicitly asks to see doctors or books, set "intent":"show_doctors".
 - If user names a doctor or a specialty explicitly, prefer that target.
 - Infer gender ("male"|"female"|null), price ("cheapest"|"expensive"|null), min experience years (number|null), and specialties (1–3 strings).
 - If requested specialty doesn’t exist or is unclear, choose the closest reasonable specialties (e.g., orthopedic/sports/emergency for trauma). If nothing fits, prefer "Emergency Medicine".
 - Do NOT say "I can help refine the list".
+- After urgent-sounding caution (e.g., “consider ER/urgent care”), **offer** “Want me to show suitable doctors here?” — **do not** show links unless the user asks.
 
 OUTPUT valid JSON ONLY:
 {
@@ -387,14 +391,12 @@ router.post('/chat', async (req, res) => {
     let directName = direct.doctor_name || null;
     let directSpecs = Array.isArray(direct.specialties) ? direct.specialties : null;
 
-    // Heuristic fallbacks (preferences)
     const heur = extractHeuristicPrefs(latestUser);
     gender = gender || heur.gender;
     const expMin = (typeof min_experience_years === 'number' ? min_experience_years : null) || heur.expMin || null;
     const wantBest = (typeof want_best === 'boolean' ? want_best : null) || heur.wantBest || null;
     const pricePref = price || heur.pricePref || null;
 
-    // Server-side direct extraction
     if (!directName) {
       const n = guessDoctorNameFromText(latestUser);
       if (n) directName = n;
@@ -404,7 +406,17 @@ router.post('/chat', async (req, res) => {
       if (mentioned.length) directSpecs = mentioned;
     }
 
-    // Force show if asked
+    // ---- NEW GATE: do not auto-show doctors unless explicitly asked or direct target given ----
+    const explicitAskOrDirect = forceShow || !!directName || (directSpecs && directSpecs.length > 0);
+    if (intent === 'show_doctors' && !explicitAskOrDirect) {
+      intent = 'chat';
+      if (!/show relevant doctors/i.test(assistant_message)) {
+        // turn this into an offer rather than showing links
+        assistant_message = `${assistant_message} Want me to show suitable doctors here?`;
+      }
+    }
+
+    // If user asked explicitly, ensure we show
     if (forceShow && intent !== 'refuse') {
       intent = 'show_doctors';
       if (!specialties || specialties.length === 0) specialties = fallbackSpecialtiesFromText(convo);
@@ -413,7 +425,6 @@ router.post('/chat', async (req, res) => {
       }
     }
 
-    // If user done and didn't ask → suggest (unchanged)
     if (!forceShow && doneFeeling && intent !== 'refuse' && intent !== 'show_doctors') {
       assistant_message = "Understood. Would you like me to show doctors that fit your needs?";
       intent = 'chat';
@@ -421,11 +432,10 @@ router.post('/chat', async (req, res) => {
 
     let doctors = [];
 
-    // 1) Direct name (priority)
+    // 1) Direct name first
     if (directName) {
       intent = 'show_doctors';
       doctors = await queryDoctorsByName({ name: directName, gender, pricePref, expMin, wantBest });
-
       if (doctors.length === 0 && directSpecs && directSpecs.length) {
         doctors = await queryDoctorsBySpecialties({ specialties: directSpecs, gender, pricePref, expMin, wantBest });
       }
@@ -433,7 +443,6 @@ router.post('/chat', async (req, res) => {
         const closeSpecs = fallbackSpecialtiesFromText(convo);
         doctors = await queryDoctorsBySpecialties({ specialties: closeSpecs, gender, pricePref, expMin, wantBest });
       }
-
       if (!assistant_message || /describe|symptom/i.test(assistant_message)) {
         assistant_message = doctors.length
           ? "Here are the matching doctors."
@@ -441,8 +450,8 @@ router.post('/chat', async (req, res) => {
       }
     }
 
-    // 2) Direct specialty (without name)
-    if (!directName && (!doctors.length) && directSpecs && directSpecs.length) {
+    // 2) Direct specialty
+    if (!directName && !doctors.length && directSpecs && directSpecs.length) {
       intent = 'show_doctors';
       doctors = await queryDoctorsBySpecialties({ specialties: directSpecs, gender, pricePref, expMin, wantBest });
       if (doctors.length === 0) {
@@ -456,11 +465,10 @@ router.post('/chat', async (req, res) => {
       }
     }
 
-    // 3) LLM/forced show without direct name/spec
-    if (!doctors.length && intent === 'show_doctors') {
+    // 3) Normal show (explicit ask)
+    if (!doctors.length && intent === 'show_doctors' && explicitAskOrDirect) {
       if (!specialties || specialties.length === 0) specialties = fallbackSpecialtiesFromText(convo);
       doctors = await queryDoctorsBySpecialties({ specialties, gender, pricePref, expMin, wantBest });
-      // NO General physician fallback branch here.
       if (!assistant_message || /describe|symptom/i.test(assistant_message)) {
         assistant_message = doctors.length
           ? "Here are doctors that match what you described."
@@ -474,5 +482,6 @@ router.post('/chat', async (req, res) => {
     return res.status(500).json({ success: false, message: 'AI service error' });
   }
 });
+
 
 export default router;

@@ -6,14 +6,13 @@ class ActionProvider {
     this.setState = setStateFunc;
     this.state = state;
 
-    // keep short rolling history
     this.history = [
       { role: 'assistant', content: 'Hello! How can I assist you with your health today?' }
     ];
 
     this.doctors = [];
     this.selectedDoctor = null;
-    this.offerPending = false; // set when we suggest showing doctors
+    this.offerPending = false;
   }
 
   updateChatbotState(message) {
@@ -25,15 +24,15 @@ class ActionProvider {
     if (this.history.length > 20) this.history = this.history.slice(-20);
   }
 
-  // --- helpers ---
   smallTalk() {
     const msg = this.createChatBotMessage("I’m doing well and here to help with your health. What’s going on?");
     this.updateChatbotState(msg);
     this._push('assistant', msg.message);
   }
 
+  // CHANGED: no doctor mention here
   greet() {
-    const msg = this.createChatBotMessage("Hi — tell me what happened and I’ll point you to the right type of doctor.");
+    const msg = this.createChatBotMessage("Hi — how can I help today? Tell me what happened.");
     this.updateChatbotState(msg);
     this._push('assistant', msg.message);
   }
@@ -51,13 +50,12 @@ class ActionProvider {
     this._push('assistant', msg.message);
   }
 
-  // Parse "10 Years" → 10
   _years(s = '') {
     const n = parseInt(String(s).match(/\d+/)?.[0] || '0', 10);
     return Number.isNaN(n) ? 0 : n;
   }
 
-  // NEW: compare currently listed doctors
+  // comparison across the currently listed doctors
   handleComparisonQuery(kind = 'experience') {
     const list = this.doctors || [];
     if (list.length < 2) {
@@ -70,35 +68,22 @@ class ActionProvider {
     let best = null;
     if (kind === 'experience') {
       best = [...list].sort((a, b) => this._years(b.experience) - this._years(a.experience))[0];
-      const m = this.createChatBotMessage(
-        `Most experienced: Dr. ${best.name} (${best.experience}).`
-      );
-      this.updateChatbotState(m);
-      this._push('assistant', m.message);
-      return;
+      const m = this.createChatBotMessage(`Most experienced: Dr. ${best.name} (${best.experience}).`);
+      this.updateChatbotState(m); this._push('assistant', m.message); return;
     }
     if (kind === 'cheapest') {
       best = [...list].sort((a, b) => a.fees - b.fees)[0];
-      const m = this.createChatBotMessage(
-        `Cheapest: Dr. ${best.name} ($${best.fees}).`
-      );
-      this.updateChatbotState(m);
-      this._push('assistant', m.message);
-      return;
+      const m = this.createChatBotMessage(`Cheapest: Dr. ${best.name} ($${best.fees}).`);
+      this.updateChatbotState(m); this._push('assistant', m.message); return;
     }
     if (kind === 'expensive') {
       best = [...list].sort((a, b) => b.fees - a.fees)[0];
-      const m = this.createChatBotMessage(
-        `Most expensive: Dr. ${best.name} ($${best.fees}).`
-      );
-      this.updateChatbotState(m);
-      this._push('assistant', m.message);
-      return;
+      const m = this.createChatBotMessage(`Most expensive: Dr. ${best.name} ($${best.fees}).`);
+      this.updateChatbotState(m); this._push('assistant', m.message); return;
     }
   }
 
   async handleUserMessage(text) {
-    // record user turn
     this._push('user', text);
 
     try {
@@ -113,15 +98,12 @@ class ActionProvider {
       const intent = json?.intent || 'chat';
       const doctors = Array.isArray(json?.doctors) ? json.doctors : [];
 
-      // assistant text
       const botMsg = this.createChatBotMessage(reply);
       this.updateChatbotState(botMsg);
       this._push('assistant', reply);
 
-      // mark if we offered
       this.offerPending = /show relevant doctors/i.test(reply);
 
-      // show doctors when asked/intent says so
       if (intent === 'show_doctors' && doctors.length) {
         this.doctors = doctors;
         localStorage.setItem('doctors', JSON.stringify(doctors));
