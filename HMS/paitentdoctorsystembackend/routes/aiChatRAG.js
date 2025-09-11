@@ -388,5 +388,6 @@ if (!raw) {
 
 // wire the handler to BOTH paths
 router.post('/ai/chat', handleChat);
+router.post('/chat', handleChat);
 
 export default router;
