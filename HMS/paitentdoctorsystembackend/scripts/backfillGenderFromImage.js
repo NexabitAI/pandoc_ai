@@ -11,7 +11,7 @@ function imageIndexFromUrl(url='') {
 }
 
 (async () => {
-  await mongoose.connect(process.env.MONGO_URL);
+  await mongoose.connect(process.env.MONGODB_URI);
   const docs = await doctorModel.find({ gender: null }).select('_id image').lean();
 
   let updated = 0;
