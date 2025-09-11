@@ -8,7 +8,7 @@ if (!apiKey) {
 }
 export const openai = new OpenAI({ apiKey });
 
-const EMBED_MODEL = process.env.EMBED_MODEL || 'text-embedding-3-small'; // 1536 dims
+const EMBED_MODEL = process.env.EMBED_MODEL || 'text-embedding-3-large'; // 1536 dims
 
 /**
  * Returns a single embedding array for a single string.
