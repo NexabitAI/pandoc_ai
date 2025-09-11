@@ -25,7 +25,7 @@ class ActionProvider {
     if (this.history.length > 20) this.history = this.history.slice(-20);
   }
 
-  // quick small-talk
+  // --- helpers ---
   smallTalk() {
     const msg = this.createChatBotMessage("I’m doing well and here to help with your health. What’s going on?");
     this.updateChatbotState(msg);
@@ -51,6 +51,52 @@ class ActionProvider {
     this._push('assistant', msg.message);
   }
 
+  // Parse "10 Years" → 10
+  _years(s = '') {
+    const n = parseInt(String(s).match(/\d+/)?.[0] || '0', 10);
+    return Number.isNaN(n) ? 0 : n;
+  }
+
+  // NEW: compare currently listed doctors
+  handleComparisonQuery(kind = 'experience') {
+    const list = this.doctors || [];
+    if (list.length < 2) {
+      const msg = this.createChatBotMessage("I need at least two doctors from the list to compare.");
+      this.updateChatbotState(msg);
+      this._push('assistant', msg.message);
+      return;
+    }
+
+    let best = null;
+    if (kind === 'experience') {
+      best = [...list].sort((a, b) => this._years(b.experience) - this._years(a.experience))[0];
+      const m = this.createChatBotMessage(
+        `Most experienced: Dr. ${best.name} (${best.experience}).`
+      );
+      this.updateChatbotState(m);
+      this._push('assistant', m.message);
+      return;
+    }
+    if (kind === 'cheapest') {
+      best = [...list].sort((a, b) => a.fees - b.fees)[0];
+      const m = this.createChatBotMessage(
+        `Cheapest: Dr. ${best.name} ($${best.fees}).`
+      );
+      this.updateChatbotState(m);
+      this._push('assistant', m.message);
+      return;
+    }
+    if (kind === 'expensive') {
+      best = [...list].sort((a, b) => b.fees - a.fees)[0];
+      const m = this.createChatBotMessage(
+        `Most expensive: Dr. ${best.name} ($${best.fees}).`
+      );
+      this.updateChatbotState(m);
+      this._push('assistant', m.message);
+      return;
+    }
+  }
+
   async handleUserMessage(text) {
     // record user turn
     this._push('user', text);
@@ -72,7 +118,7 @@ class ActionProvider {
       this.updateChatbotState(botMsg);
       this._push('assistant', reply);
 
-      // If the reply looks like an offer, mark it so a "yes/show" next turn triggers doctors.
+      // mark if we offered
       this.offerPending = /show relevant doctors/i.test(reply);
 
       // show doctors when asked/intent says so
