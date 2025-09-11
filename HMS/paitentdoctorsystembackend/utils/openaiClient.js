@@ -5,8 +5,6 @@ import 'dotenv/config';
 export const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
-      organization: process.env.OPENAI_ORG_ID,      // optional
-      project: process.env.OPENAI_PROJECT_ID        // optional
     })
   : null;
 
