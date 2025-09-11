@@ -35,8 +35,7 @@ app.use("/api/admin", adminRouter)
 app.use("/api/doctor", doctorRouter)
 app.use("/api/get-speciality", getSpecialityRoute)
 app.use('/api/specialties', specialtiesRouter);
-app.use('/api/ai', aiChatRAG);
-app.use('/api', aiChatRAG);
+app.use('/api/ai/chat', aiChatRAG);
 
 app.get("/api", (req, res) => {
   res.send("API Working")
