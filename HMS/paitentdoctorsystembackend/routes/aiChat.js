@@ -12,6 +12,8 @@ import {
   escapeRx
 } from '../utils/intentEngine.js';
 import { logInfo, logWarn, logErr } from '../utils/logger.js';
+import { mapTextToSpecialties } from '../utils/specMap.js';
+
 
 const router = express.Router();
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
@@ -325,33 +327,42 @@ router.post('/chat', async (req, res) => {
     }
 
     // EMPTY / unclear → if we just offered, treat “yes/ok” as show; else ask to rephrase
-    if (!text || turn.intent === 'unknown') {
-      if (ctx.lastOfferWasShowDoctors && /\b(yes|yep|yeah|ok|okay|sure|please|do it|go ahead)\b/i.test(text)) {
-        // show using last known/inferred specialty
-        const baseSpecs = ctx.lastSpecialty ? [ctx.lastSpecialty] : ['Emergency Medicine'];
-        const { results } = await queryDoctors({
-          specialties: baseSpecs,
-          gender: ctx.filters.gender,
-          price:  ctx.filters.price,
-          expMin: ctx.filters.expMin,
-          wantBest: ctx.filters.wantBest,
-          page: 1, pageSize: ctx.pagination.pageSize
-        });
-        const reply = results.length ? "Here are doctors that match what you need." : "No matching doctors right now.";
-        ctx.lastList = results;
-        ctx.pagination.page = 1;
-        ctx.lastOfferWasShowDoctors = false;
+    // UNKNOWN / unclear
+if (!text || turn.intent === 'unknown') {
+  // permissive fallback: "show doctor(s)" anywhere → show
+  if (/\b(show|give|find|list|provide|send)\b/i.test(raw) && /\bdoctor(s)?\b/i.test(raw)) {
+    const wantSpecs = turn.entities?.explicitSpecs?.length
+      ? turn.entities.explicitSpecs
+      : (ctx.lastSpecialty ? [ctx.lastSpecialty] : (mapTextToSpecialties(raw)[0] ? [mapTextToSpecialties(raw)[0]] : ['Emergency Medicine']));
 
-        ctx.messages.push({ role:'assistant', content: reply });
-        await saveCtx(tenantId, userId, chatId, ctx);
-        return res.json({ success:true, reply, intent:'show_doctors', doctors: cardsFromDocs(results) });
-      }
-      const reply = "I didn’t catch that—could you rephrase, or say “show doctors”?";
-      ctx.lastOfferWasShowDoctors = false;
-      ctx.messages.push({ role:'assistant', content: reply });
-      await saveCtx(tenantId, userId, chatId, ctx);
-      return res.json({ success:true, reply, intent:'chat', doctors:[] });
-    }
+    const { results } = await queryDoctors({
+      specialties: wantSpecs,
+      gender: ctx.filters.gender,
+      price:  ctx.filters.price,
+      expMin: ctx.filters.expMin,
+      wantBest: ctx.filters.wantBest,
+      page: 1,
+      pageSize: ctx.pagination.pageSize
+    });
+
+    const reply = results.length ? "Here are doctors that match what you described." : "No matching doctors right now.";
+    ctx.lastSpecialty = wantSpecs[0] || ctx.lastSpecialty;
+    ctx.lastList = results;
+    ctx.pagination.page = 1;
+    ctx.lastOfferWasShowDoctors = false;
+
+    ctx.messages.push({ role:'assistant', content: reply });
+    await saveCtx(tenantId, userId, chatId, ctx);
+    return res.json({ success:true, reply, intent:'show_doctors', doctors: cardsFromDocs(results) });
+  }
+
+  const reply = "I couldn’t quite understand that. You can say things like “knee pain” or “show doctors”.";
+  ctx.lastOfferWasShowDoctors = false;
+  ctx.messages.push({ role:'assistant', content: reply });
+  await saveCtx(tenantId, userId, chatId, ctx);
+  return res.json({ success:true, reply, intent:'chat', doctors:[] });
+}
+
 
     // Fallback (shouldn’t normally hit)
     const fallback = "I can help summarize symptoms and show relevant doctors. Try “knee pain” or “show doctors”.";
