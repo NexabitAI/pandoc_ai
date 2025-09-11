@@ -16,10 +16,29 @@ function conversationText(messages=[]) {
   return messages.map(m => `${m.role}: ${m.content}`).join('\n');
 }
 
-function lastUserWantsDoctors(txt='') {
-  const t = txt.toLowerCase();
-  return /\b(doctor|doctors|give me (a|the) doctor|find (a|the) doctor|see (a|the) doctor|book|appointment|who should i see|show doctors|yes show|yes please|show me)\b/.test(t);
+function lastUserWantsDoctors(txt = '') {
+  const t = String(txt).toLowerCase().replace(/\s+/g, ' ').trim();
+
+  // Keep it simple: a small set of normal regexes checked in order.
+  const patterns = [
+    /\bshow me (a|the)?\s*doctor(s)?\b/,
+    /\bgive me (a|the)?\s*doctor(s)?\b/,
+    /\bsend me (a|the)?\s*doctor(s)?\b/,
+    /\bfind (me )?(a|the)?\s*doctor(s)?\b/,
+    /\b(i )?need (a|the)?\s*doctor(s)?\b/,
+    /\bbook (a|the)?\s*doctor\b/,
+    /\bdoctor please\b/,
+    /\bany doctor(s)?\b/,
+    /\bshow doctor(s)?\b/,
+    /\bshow doctors\b/,
+    // last on purpose; broadest one:
+    /\bshow me\b/
+  ];
+
+  return patterns.some((rx) => rx.test(t));
 }
+
+
 function userSeemsDone(txt='') {
   const t = txt.toLowerCase();
   return /\b(that'?s all|nothing more|no other|nothing else|that is it|that'?s it)\b/.test(t);
@@ -399,18 +418,7 @@ router.post('/chat', async (req, res) => {
     const expMin = (typeof min_experience_years === 'number' ? min_experience_years : null) || heur.expMin || null;
     const wantBest = (typeof want_best === 'boolean' ? want_best : null) || heur.wantBest || null;
     const pricePref = price || heur.pricePref || null;
-const askingNow =
-  /\?\s*$/.test((assistant_message || '').trim()) ||  // ends with a question mark
-  /specif(y|ic)/i.test(assistant_message || '');      // contains "specify/specific"
 
-if (askingNow) {
-  return res.json({
-    success: true,
-    reply: assistant_message,
-    intent: 'request_more_info',   // ask-only turn
-    doctors: []                    // <-- critical: no profiles in this turn
-  });
-}
     if (!directName) {
       const n = guessDoctorNameFromText(latestUser);
       if (n) directName = n;
@@ -419,12 +427,21 @@ if (askingNow) {
       const mentioned = await findMentionedSpecialtiesInText(latestUser);
       if (mentioned.length) directSpecs = mentioned;
     }
-   // If the assistant is clearly asking a clarifying question, do NOT show doctors in this turn.
-   const askingNoww = /\?\s*$/.test(assistant_message.trim()) || /specif(y|ic)/i.test(assistant_message);
-   if (askingNoww && !directName && !(directSpecs && directSpecs.length)) {
-     // Force this to a pure "ask" turn; suppress auto show even if "doctor" was mentioned.
-     intent = 'request_more_info';
-   }
+   // If assistant is asking a clarifying question, do NOT show doctors…
+// …UNLESS the user explicitly asked to see doctors (forceShow).
+const askingNow =
+  /\?\s*$/.test((assistant_message || '').trim()) ||
+  /specif(y|ic)/i.test(assistant_message || '');
+
+if (askingNow && !forceShow) {
+  return res.json({
+    success: true,
+    reply: assistant_message,
+    intent: 'request_more_info',
+    doctors: []
+  });
+}
+
 
    
     // ---- NEW GATE: do not auto-show doctors unless explicitly asked or direct target given ----
@@ -496,6 +513,24 @@ if (askingNow) {
           : "I can pull the right specialists. Is the issue mainly joint-related or something else?";
       }
     }
+
+    // In your section:
+// if (!doctors.length && intent === 'show_doctors') { ... }
+
+if (!doctors.length && intent === 'show_doctors' && forceShow) {
+  // final broad fallback: show any available doctors (no questions)
+  doctors = await doctorModel
+    .find({ available: true })
+    .select('_id name speciality fees experience degree image address gender')
+    .sort({ date: -1 })
+    .limit(12)
+    .lean();
+
+  assistant_message = doctors.length
+    ? "Here are available doctors."
+    : "No doctors are available right now.";
+}
+
 
     return res.json({ success: true, reply: assistant_message, intent, doctors });
   } catch (e) {
