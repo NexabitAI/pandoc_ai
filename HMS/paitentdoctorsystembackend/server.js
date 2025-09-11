@@ -9,6 +9,7 @@ import adminRouter from "./routes/adminRoute.js"
 import getSpecialityRoute from "./routes/getSpeciality.js";
 import specialtiesRouter from './routes/specialties.js';
 import aiChatRouter from './routes/aiChat.js';
+import aiChatRAG from './routes/aiChatRAG.js'; 
 
 // app config
 const app = express()
@@ -18,7 +19,7 @@ connectCloudinary()
 
 // middlewares
 
-app.use(express.json())
+app.use(express.json({ limit: '1mb' }))
 app.use(cors({
   origin: [
     "https://mypandoc.com",
@@ -36,6 +37,7 @@ app.use("/api/doctor", doctorRouter)
 app.use("/api/get-speciality", getSpecialityRoute)
 app.use('/api/specialties', specialtiesRouter);
 app.use('/api/ai', aiChatRouter);
+app.use('/api', aiChatRAG);
 
 app.get("/api", (req, res) => {
   res.send("API Working")

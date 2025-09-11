@@ -1,0 +1,14 @@
+# Specialty Mapping Hints
+- "skin, rash, acne, eczema": Dermatologist
+- "eye, redness, vision": Ophthalmology
+- "ear, nose, throat, sinus": Otolaryngology (ENT)
+- "knee, shoulder, sprain, bone, fracture": Orthopedic Surgery or Sports Medicine
+- "headache + fever, seizure, stroke, head injury": Neurologist
+- "chest pain, palpitations": Cardiology
+- "thyroid, diabetes": Endocrinology, Diabetes & Metabolism
+- "stomach pain, acid reflux": Gastroenterologist
+- "pregnancy, pelvic pain, periods": Gynecologist
+- "child, kid, pediatric": Pediatricians
+- "urine, prostate": Urology
+- If unclear: General physician
+- If severe trauma/bleeding: Emergency Medicine
