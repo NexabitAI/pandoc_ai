@@ -16,29 +16,22 @@ function conversationText(messages=[]) {
   return messages.map(m => `${m.role}: ${m.content}`).join('\n');
 }
 
-/** EXPANDED: treat many “show/give me … doctor(s)” phrasings, incl. adjectives like “suitable/relevant/any/nearby”. */
+/** EXPANDED: treat many “show/give/send … doctor(s)” phrasings, incl. adjectives. */
 function lastUserWantsDoctors(txt = '') {
   const t = String(txt).toLowerCase().replace(/\s+/g, ' ').trim();
 
   const patterns = [
-    // explicit “show/give/send/provide/list/share/find/get/book … doctor(s)”
     /\b(show|give|send|provide|list|share|find|get|book)\s+(me\s+)?((a|the)\s+)?(suitable|relevant|nearby|any)?\s*doctor(s)?\b/,
-    // “doctor please / any doctor”
     /\bdoctor(s)?\s*(please|now)\b/,
     /\bany doctor(s)?\b/,
-    // “show doctors / show me”
     /\bshow doctor(s)?\b/,
     /\bshow doctors\b/,
     /\bshow me\b/,
-    // “just show me … doctor(s)”
     /\bjust show (me )?((a|the)\s+)?(suitable|relevant|nearby|any)?\s*doctor(s)?\b/,
-    // “give me … doctors” allowing adjectives in between
     /\bgive me (suitable|relevant|nearby|any)?\s*doctor(s)?\b/,
-    // “doctor(s) for …”
     /\bdoctor(s)?\s+for\b/
   ];
 
-  // also: “yes/ok/please … doctor(s)” as a direct show signal
   const yesWithDoctors = /\b(yes|yeah|yep|ok|okay|sure|please)\b.*\bdoctor(s)?\b/.test(t);
 
   return yesWithDoctors || patterns.some(rx => rx.test(t));
@@ -105,26 +98,7 @@ async function findMentionedSpecialtiesInText(txt='') {
   if (/\bpedia|child|kid\b/i.test(txt)) found.add('Pediatricians');
   if (/\bendocrin|thyroid|diabet\b/i.test(txt)) found.add('Endocrinology, Diabetes & Metabolism');
   if (/\bbone(s)?\b|orthopedic|orthopaedic/i.test(txt)) found.add('Orthopedic Surgery');
-  return Array.from(found);
-}
-
-function fallbackSpecialtiesFromText(text='') {
-  const t = text.toLowerCase();
-  const picks = new Set();
-
-  if (/\bdermat(o|ology|ologist)|skin\b/.test(t)) picks.add('Dermatologist');
-  if (/\bcardio|chest pain|heart\b/.test(t)) picks.add('Cardiology');
-  if (/\bneuro|nerv|seiz|stroke|head injur(y)?|headache\b/.test(t)) picks.add('Neurologist');
-  if (/\bpsych|anxiety|depress|mental\b/.test(t)) picks.add('Psychiatry');
-  if (/\bent|ear|nose|throat\b/.test(t)) picks.add('Otolaryngology (ENT)');
-  if (/\bophthal|eye\b/.test(t)) picks.add('Ophthalmology');
-  if (/\buro|urine|prostate\b/.test(t)) picks.add('Urology');
-  if (/\bgastro|stomach|abdomen|acid\b/.test(t)) picks.add('Gastroenterologist');
-  if (/\bobgyn|gyne|pregnan|pelvic|period\b/.test(t)) picks.add('Gynecologist');
-  if (/\bpedia|child|kid\b/.test(t)) picks.add('Pediatricians');
-  if (/\bendocrin|thyroid|diabet\b/.test(t)) picks.add('Endocrinology, Diabetes & Metabolism');
-  if (/\bbone(s)?\b|orthopedic|orthopaedic/.test(t)) picks.add('Orthopedic Surgery');
-   if (/\bdermat(o|ology|ologist)|skin|rash|acne|eczema|psoriasis|hives|itch|alopecia|hair loss|nail|fungus\b/.test(t)) picks.add('Dermatologist');
+  if (/\bdermat(o|ology|ologist)|skin|rash|acne|eczema|psoriasis|hives|itch|alopecia|hair loss|nail|fungus\b/.test(t)) picks.add('Dermatologist');
   if (/\bcardio|heart|chest pain|angina|palpitation|arrhythmia|murmur|hypertension|blood pressure\b/.test(t)) picks.add('Cardiology');
   if (/\blung|pulmo|breath(ing)?|shortness of breath|sob|wheeze|asthma|copd|pneumonia|cough|pleur|emphysema\b/.test(t)) picks.add('Pulmonology');
   if (/\bgastro|stomach|abdomen|abdominal|belly|gastric|acid reflux|gerd|ulcer|diarrhea|constipation|vomit|nausea|ibs|bloating|indigestion\b/.test(t)) picks.add('Gastroenterologist');
@@ -192,6 +166,25 @@ function fallbackSpecialtiesFromText(text='') {
   if (/\bneurocritical care|icu neuro|intracranial pressure\b/.test(t)) picks.add('Neurocritical Care');
   if (/\baesthetic|cosmetic (medicine|injectable)|botox|filler\b/.test(t)) picks.add('Aesthetic Medicine');
 
+  return Array.from(found);
+}
+
+function fallbackSpecialtiesFromText(text='') {
+  const t = text.toLowerCase();
+  const picks = new Set();
+
+  if (/\bdermat(o|ology|ologist)|skin\b/.test(t)) picks.add('Dermatologist');
+  if (/\bcardio|chest pain|heart\b/.test(t)) picks.add('Cardiology');
+  if (/\bneuro|nerv|seiz|stroke|head injur(y)?|headache\b/.test(t)) picks.add('Neurologist');
+  if (/\bpsych|anxiety|depress|mental\b/.test(t)) picks.add('Psychiatry');
+  if (/\bent|ear|nose|throat\b/.test(t)) picks.add('Otolaryngology (ENT)');
+  if (/\bophthal|eye\b/.test(t)) picks.add('Ophthalmology');
+  if (/\buro|urine|prostate\b/.test(t)) picks.add('Urology');
+  if (/\bgastro|stomach|abdomen|acid\b/.test(t)) picks.add('Gastroenterologist');
+  if (/\bobgyn|gyne|pregnan|pelvic|period\b/.test(t)) picks.add('Gynecologist');
+  if (/\bpedia|child|kid\b/.test(t)) picks.add('Pediatricians');
+  if (/\bendocrin|thyroid|diabet\b/.test(t)) picks.add('Endocrinology, Diabetes & Metabolism');
+  if (/\bbone(s)?\b|orthopedic|orthopaedic/.test(t)) picks.add('Orthopedic Surgery');
 
   // trauma / MSK
   if (/(fall|accident|injur|fractur|sprain|bruise|swollen|swelling|limited movement|joint|knee|ankle|wrist|shoulder)/.test(t)) {
@@ -202,14 +195,17 @@ function fallbackSpecialtiesFromText(text='') {
     picks.add('Emergency Medicine'); picks.add('Wound Care'); picks.add('General Surgery');
   }
 
-  if (picks.size === 0) picks.add('Emergency Medicine');
+  // IMPORTANT: no blanket default to Emergency Medicine here.
   return Array.from(picks);
 }
 
 async function queryDoctorsBySpecialties({ specialties, gender, pricePref, expMin, wantBest }) {
-  if (!Array.isArray(specialties) || specialties.length === 0) specialties = ['Emergency Medicine'];
-  const or = specialties.map(s => ({ speciality: { $regex: new RegExp(`^${escapeRegex(s)}$`, 'i') } }));
-  const query = { available: true, $or: or };
+  // If no specialties inferred, do NOT force Emergency Medicine.
+  const query = { available: true };
+  if (Array.isArray(specialties) && specialties.length > 0) {
+    const or = specialties.map(s => ({ speciality: { $regex: new RegExp(`^${escapeRegex(s)}$`, 'i') } }));
+    query.$or = or;
+  }
   if (gender) query.gender = new RegExp(`^${gender}$`, 'i');
 
   let docs = await doctorModel
@@ -234,7 +230,7 @@ async function queryDoctorsBySpecialties({ specialties, gender, pricePref, expMi
     docs.sort((a, b) => (a.speciality || '').localeCompare(b.speciality || '') || (a.name||'').localeCompare(b.name||''));
   }
 
-  return docs;
+  return docs; // ALL matches (or all available if none specified)
 }
 
 async function queryDoctorsByName({ name, gender, pricePref, expMin, wantBest }) {
@@ -265,6 +261,7 @@ async function queryDoctorsByName({ name, gender, pricePref, expMin, wantBest })
     docs.sort((a, b) => (a.speciality || '').localeCompare(b.speciality || '') || (a.name||'').localeCompare(b.name||''));
   }
 
+  // Loose contains fallback for "closest one"
   if (docs.length === 0) {
     const loose = new RegExp(escapeRegex(String(name).trim()), 'i');
     const altQuery = { available: true, name: loose };
@@ -329,7 +326,7 @@ router.post('/chat', async (req, res) => {
     const doneFeeling = userSeemsDone(latestUser);
     const convo = conversationText(messages);
 
-    // If previous assistant OFFERED to show docs, a simple “yes/ok/please” counts as forceShow.
+    // If previous assistant offered to show docs, “yes/ok/please” counts as forceShow.
     const prevAssistant = [...messages].reverse().find(m => m.role === 'assistant')?.content || '';
     const userSaidYes = /\b(yes|yeah|yep|sure|ok|okay|please)\b/i.test(latestUser);
     const prevOffered = /show (relevant|suitable) doctors/i.test(prevAssistant);
@@ -396,7 +393,11 @@ router.post('/chat', async (req, res) => {
     // If user asked explicitly, ensure we show
     if (forceShow && intent !== 'refuse') {
       intent = 'show_doctors';
-      if (!specialties || specialties.length === 0) specialties = fallbackSpecialtiesFromText(convo);
+      if (!specialties || specialties.length === 0) {
+        const fb = fallbackSpecialtiesFromText(convo);
+        const mentioned = await findMentionedSpecialtiesInText(convo);
+        specialties = fb.length ? fb : mentioned; // leave empty if none -> query returns ALL available, not just Emergency
+      }
       if (!assistant_message || /describe|symptom/i.test(assistant_message)) {
         assistant_message = "Here are doctors that match what you described.";
       }
@@ -444,7 +445,11 @@ router.post('/chat', async (req, res) => {
 
     // 3) Normal show (explicit ask)
     if (!doctors.length && intent === 'show_doctors' && explicitAskOrDirect) {
-      if (!specialties || specialties.length === 0) specialties = fallbackSpecialtiesFromText(convo);
+      if (!specialties || specialties.length === 0) {
+        const fb = fallbackSpecialtiesFromText(convo);
+        const mentioned = await findMentionedSpecialtiesInText(convo);
+        specialties = fb.length ? fb : mentioned; // leave empty if none -> query returns ALL available
+      }
       doctors = await queryDoctorsBySpecialties({ specialties, gender, pricePref, expMin, wantBest });
       if (!assistant_message || /describe|symptom/i.test(assistant_message)) {
         assistant_message = doctors.length
