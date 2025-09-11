@@ -8,6 +8,7 @@ import doctorRouter from "./routes/doctorRoute.js"
 import adminRouter from "./routes/adminRoute.js"
 import getSpecialityRoute from "./routes/getSpeciality.js";
 import specialtiesRouter from './routes/specialties.js';
+import aiChatRouter from './routes/aiChat.js';
 
 // app config
 const app = express()
@@ -34,6 +35,7 @@ app.use("/api/admin", adminRouter)
 app.use("/api/doctor", doctorRouter)
 app.use("/api/get-speciality", getSpecialityRoute)
 app.use('/api/specialties', specialtiesRouter);
+app.use('/api/ai', aiChatRouter);
 
 app.get("/api", (req, res) => {
   res.send("API Working")
