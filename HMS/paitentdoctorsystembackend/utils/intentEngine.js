@@ -1,7 +1,44 @@
 // utils/intentEngine.js
 import { mapTextToSpecialties } from './specMap.js';
 
-const clean = (s='') =>
+/** Safely escape a string for use inside a RegExp */
+export const escapeRx = (s = '') =>
+  String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Parse "10 Years" -> 10 (number). If missing, 0. */
+export const stripYears = (val) => {
+  if (typeof val === 'number') return val;
+  const m = String(val || '').match(/(\d+)/);
+  return m ? Number(m[1]) : 0;
+};
+
+/** One-line, empathetic summary. Uses OpenAI if available, else a safe fallback. */
+export async function summarizeEmpathetic(openai, raw) {
+  const txt = String(raw || '').trim();
+  const fallback = txt
+    ? `That sounds concerning. From what you shared: ${txt}.`
+    : `That sounds concerning.`;
+
+  // Try OpenAI if wired; always fail safe to fallback
+  try {
+    if (openai?.responses?.create) {
+      const r = await openai.responses.create({
+        model: process.env.SUMMARY_MODEL || 'gpt-4o-mini',
+        input:
+          `In ONE supportive line (<=18 words), summarize the patient's concern without diagnosing, avoid commands:\n` +
+          txt
+      });
+      const out = r?.output_text?.trim();
+      if (out) return out;
+    }
+  } catch (_e) { /* ignore and use fallback */ }
+
+  return fallback;
+}
+
+/* ---------------- Intent parsing (more permissive) ---------------- */
+
+const clean = (s = '') =>
   String(s)
     .replace(/\u2018|\u2019/g, "'")
     .replace(/\u201C|\u201D/g, '"')
@@ -9,11 +46,12 @@ const clean = (s='') =>
     .trim();
 
 const hasHealthish = (t) =>
-  /\b(fever|pain|headache|rash|injur|bleed|swollen|swelling|cough|cold|breath|fracture|sprain|nausea|vomit|diarrh|burn|cut|wound|fall|fell|accident|bruise|dizzy|fatigue)\b/i.test(t);
+  /\b(fever|chills|pain|ache|headache|rash|injur|bleed|swollen|swelling|cough|cold|breath|fracture|sprain|nausea|vomit|diarrh|burn|cut|wound|fall|fell|accident|bruise|dizzy|fatigue|palpitation|tightness)\b/i.test(
+    t
+  );
 
 const yesish = /\b(yes|yep|yeah|yup|ok|okay|sure|please|do it|go ahead)\b/i;
-const wantShowDoctors =
-  /\b(show|give|list|find|provide|send)\b.*\bdoctor(s)?\b/i;
+const wantShowDoctors = /\b(show|give|list|find|provide|send|get)\b.*\bdoctor(s)?\b/i;
 
 const genderRx = /\b(female|male|woman|man|lady|gent(leman)?)\b/i;
 const cheapestRx = /\b(cheapest|low\s*cost|affordable|budget)\b/i;
@@ -35,7 +73,13 @@ function parseFilters(t) {
   return f;
 }
 
-export function parseTurn({ text, dbSpecs = [], prevOffered = false, lastSpecialty = null }) {
+/** Main turn parser used by routes */
+export function parseTurn({
+  text,
+  dbSpecs = [],
+  prevOffered = false,
+  lastSpecialty = null
+}) {
   const raw = text || '';
   const t = clean(raw);
 
@@ -44,20 +88,26 @@ export function parseTurn({ text, dbSpecs = [], prevOffered = false, lastSpecial
     return { intent: 'abusive', flags: { abusive: true }, entities: {} };
   }
 
-  // 1) trivial small talk
-  if (/\b(hi|hello|hey)\b/.test(t)) return { intent: 'greeting', flags: {}, entities: {} };
-  if (/\bhow are you\b/.test(t)) return { intent: 'how_are_you', flags: {}, entities: {} };
+  // 1) small talk
+  if (/\b(hi|hello|hey)\b/.test(t))
+    return { intent: 'greeting', flags: {}, entities: {} };
+  if (/\bhow are you\b/.test(t))
+    return { intent: 'how_are_you', flags: {}, entities: {} };
 
   // 2) HMS help
-  if (/\b(reschedul|cancel|upload report|where is my appointment|pandoc)\b/i.test(t)) {
+  if (
+    /\b(reschedul|cancel|upload report|where is my appointment|pandoc)\b/i.test(
+      t
+    )
+  ) {
     return { intent: 'hms_help', flags: {}, entities: {} };
   }
 
-  // 3) “show doctor(s)” — accept lots of variants, including “for <thing>”
+  // 3) “show doctor(s)” — allow many variants, incl. “for <thing>”
   if (wantShowDoctors.test(t) || (prevOffered && yesish.test(t))) {
-    // capture “for <thing>”
     let explicitSpecs = [];
-    const forMatch = t.match(/\bfor\s+([a-z0-9 \-']{2,40})$/i);
+    // capture tail "for <thing>"
+    const forMatch = t.match(/\bfor\s+([a-z0-9 \-']{2,60})$/i);
     if (forMatch) {
       explicitSpecs = mapTextToSpecialties(forMatch[1]);
     }
@@ -66,14 +116,18 @@ export function parseTurn({ text, dbSpecs = [], prevOffered = false, lastSpecial
     return {
       intent: 'show_doctors',
       flags: { wantsDoctors: true },
-      entities: { explicitSpecs, inferredSpecs: mapTextToSpecialties(t), filters: parseFilters(t) }
+      entities: {
+        explicitSpecs,
+        inferredSpecs: mapTextToSpecialties(t),
+        filters: parseFilters(t)
+      }
     };
   }
 
   // 4) Specialty by name (from DB list)
   const explicitSpecs = [];
   for (const name of dbSpecs) {
-    const rx = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    const rx = new RegExp(`\\b${escapeRx(name)}\\b`, 'i');
     if (rx.test(t)) explicitSpecs.push(name);
   }
   if (explicitSpecs.length) {
