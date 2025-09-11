@@ -1,211 +1,333 @@
 // utils/intentEngine.js
-export const escapeRx = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-export const stripYears = (s='') => {
-  const n = parseInt(String(s).match(/\d+/)?.[0] || '0', 10);
-  return isNaN(n) ? 0 : n;
-};
+import 'dotenv/config';
 
-const norm = (s='') => String(s).toLowerCase().replace(/\s+/g,' ').trim();
-
-function isAffirmative(t) {
-  return /\b(yes|yep|yeah|y|ok|okay|sure|please|pls|do it|go ahead)\b/i.test(t);
+/**
+ * Utility: Normalize text gently (keep letters/numbers/apostrophes, collapse spaces).
+ */
+export function normalize(s = '') {
+  return String(s)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}'\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-function parseFilters(t) {
-  const out = {};
-  if (/\b(female|woman|lady)\b/i.test(t)) out.gender = 'female';
-  if (/\b(male|man|gent|gentleman)\b/i.test(t)) out.gender = 'male';
-  if (/\b(cheapest|cheap|low\s*-?\s*cost|budget|affordable)\b/i.test(t)) out.price = 'cheapest';
-  if (/\b(expensive|premium|top\s*-?\s*tier|highest\s*fee)\b/i.test(t)) out.price = 'expensive';
-  const cap = t.match(/\b(?:under|below|within|<=?)\s*\$?(\d{2,4})\b/i);
-  if (cap) out.price = { cap: Number(cap[1]) };
-  const y = t.match(/(\d{1,2})\+?\s*(years?|yrs?)\s*(experience|exp)?/i);
-  if (y) out.expMin = Number(y[1]);
-  if (/\b(best|most experienced|senior|top doctor)\b/i.test(t)) out.wantBest = true;
-  return out;
+/**
+ * Escape a string for use inside a RegExp.
+ */
+export function escapeRx(s = '') {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function matchExplicitSpecialty(t, dbSpecs=[]) {
-  const hits = [];
-  dbSpecs.forEach(s => {
-    const rx = new RegExp(`\\b${escapeRx(s.toLowerCase())}\\b`, 'i');
-    if (rx.test(t)) hits.push(s);
-  });
-  return hits;
+/**
+ * Convert "10 Years" -> 10 (number), robust for variants.
+ */
+export function stripYears(exp = '') {
+  const m = String(exp).match(/(\d+)\s*y/i);
+  return m ? parseInt(m[1], 10) : 0;
 }
 
-function inferByBodyPart(t) {
-  const bag = new Set();
-  const rules = [
-    { rx: /\b(knee|ankle|wrist|shoulder|hip|elbow|sprain|fractur|dislocation|meniscus|acl|rotator|bone)\b/i, add: ['Orthopedic Surgery','Sports Medicine'] },
-    { rx: /\bskin|rash|acne|eczema|psoriasis|hives|itch|alopecia\b/i, add: ['Dermatologist'] },
-    { rx: /\b(chest pain|heart|palpitation|cardio)\b/i, add: ['Cardiology'] },
-    { rx: /\b(headache|migraine|seiz|stroke|numb|tingl|neuro|brain|concussion|head injury)\b/i, add: ['Neurologist'] },
-    { rx: /\beye|vision|red eye|ophthal|blurry\b/i, add: ['Ophthalmology'] },
-    { rx: /\b(ent|ear|nose|throat|sinus|tonsil|adenoid|sore throat)\b/i, add: ['Otolaryngology (ENT)'] },
-    { rx: /\b(thyroid|hormone|diabet|endocrin)\b/i, add: ['Endocrinology, Diabetes & Metabolism'] },
-    { rx: /\b(stomach|abdomen|belly|reflux|gerd|ulcer|nausea|vomit|diarrhea|constipation|gastro|acid)\b/i, add: ['Gastroenterologist'] },
-    { rx: /\b(kidney|renal|uti|urinary|prostate|urolog|burning urination)\b/i, add: ['Urology'] },
-    { rx: /\b(pediatr|child|kid|toddler|infant|baby)\b/i, add: ['Pediatricians'] },
-    { rx: /\b(pregnan|period|gyne|obgyn|pelvic|uter|ovary|cervix|vagin|missed period)\b/i, add: ['Gynecologist'] },
-    { rx: /\b(bleed|laceration|cut|gash|fainted|unconscious|severe pain|shortness of breath|can'?t breathe|accident|trauma|fell|fall|collision)\b/i, add: ['Emergency Medicine'] },
-  ];
-  rules.forEach(r => { if (r.rx.test(t)) r.add.forEach(s => bag.add(s)); });
-  if (/(fall|accident|injur|fractur|sprain|bruise|swollen|swelling|limited movement|joint)/i.test(t)) {
-    bag.add('Orthopedic Surgery'); bag.add('Sports Medicine'); bag.add('Emergency Medicine');
-  }
-  return Array.from(bag);
-}
+/**
+ * Optional empathy summary using OpenAI. If no client, do a simple local summary.
+ */
+export async function summarizeEmpathetic(openai, rawText) {
+  const text = normalize(rawText);
+  if (!text) return "I’m here to help. ";
 
-function emergencyCautionNeeded(t) {
-  return /\b(bleeding a lot|severe bleeding|can'?t breathe|fainted|unconscious|chest pain|head injury|stroke|seizure)\b/i.test(t);
-}
+  // Basic local summary (fallback)
+  const local = (() => {
+    // pull a few key tokens for a friendly 1-liner
+    const pick = text.split(' ').slice(0, 14).join(' ');
+    return `I’m sorry you’re dealing with this — I see: “${pick}…”. `;
+  })();
 
-function wantDoctors(t, prevOffered) {
-  const hasDoctorWord = /\b(doct\w*r?s?|dr)\b/i.test(t); // doctor|doctors|docter|doctorw|dr
-  if (/\b(show|give|send|provide|list|share|find|get|book)\b/i.test(t) && hasDoctorWord) return true;
-  if (/\bdoctor(s)?\s*(please|now)\b/i.test(t)) return true;
-  if (/\bshow doctors?\b/i.test(t) || /\bdoctor please\b/i.test(t)) return true;
-  if (prevOffered && isAffirmative(t)) return true; // “yes/ok” after we offered
-  return false;
-}
-
-function detectAbuse(t) {
-  return /\b(fuck|shit|bitch|idiot|dumb|stupid|kill yourself|retard)\b/i.test(t);
-}
-
-function detectBooking(t) {
-  return /\b(book|schedule|reserve|make an appointment|confirm appointment)\b/i.test(t);
-}
-
-function detectHMSSupport(t) {
-  return /\b(reschedule|upload (reports|files)|where is my appointment|reset password|cancel appointment)\b/i.test(t);
-}
-
-function detectOutOfScope(t) {
-  return /\b(stock|bitcoin|crypto|politics|election|weather|sports score)\b/i.test(t);
-}
-
-function detectCompare(t) {
-  return {
-    askCheapest: /\b(cheapest|lowest fee|least expensive|who is cheapest)\b/i.test(t),
-    askExpensive: /\b(most expensive|highest fee|who is priciest)\b/i.test(t),
-    askMostExperienced: /\b(more experienced|most experienced|highest experience|senior)\b/i.test(t),
-  };
-}
-
-function detectPagination(t) {
-  return /\b(more|next|load more|show more)\b/i.test(t);
-}
-
-function detectNameLookup(raw) {
-  const m = raw.match(/\b(?:dr\.?|doctor)\s+([a-z][a-z]+(?:\s+[a-z][a-z]+){0,2})\b/i);
-  return m?.[1] || null;
-}
-
-// Safe, non-diagnostic general/self-care tips (enabled for minor issues)
-function minorSafeTips(t) {
-  const tips = [];
-  if (/\b(headache|tension|mild fever)\b/i.test(t)) tips.push(
-    "For mild headache/fever, rest, hydrate, and consider a general over-the-counter pain reliever if you usually tolerate it."
-  );
-  if (/\b(muscle strain|sprain|bruise)\b/i.test(t)) tips.push(
-    "For mild sprain/strain, rest and gentle icing may help in the short term."
-  );
-  if (/\b(heartburn|reflux|acid)\b/i.test(t)) tips.push(
-    "Avoid trigger foods and large meals close to bedtime; elevate head while sleeping."
-  );
-  if (/\b(allergy|itch|sneeze|hay fever)\b/i.test(t)) tips.push(
-    "Limit exposure to triggers; saline nasal rinses may help with congestion."
-  );
-  return tips.slice(0,2);
-}
-
-export function parseTurn({ text, dbSpecs=[], prevOffered=false, lastSpecialty=null }) {
-  const t = norm(text);
-
-  if (!t) return { intent:'unknown', entities:{}, flags:{}, raw: text };
-
-  // abuse & scope
-  const abusive = detectAbuse(t);
-  if (abusive) return { intent:'abusive', entities:{}, flags:{ abusive:true }, raw: text };
-
-  if (detectOutOfScope(t)) return { intent:'out_of_scope', entities:{}, flags:{}, raw: text };
-  if (detectHMSSupport(t)) return { intent:'hms_help', entities:{}, flags:{}, raw: text };
-  if (detectBooking(t)) return { intent:'booking', entities:{}, flags:{ wantsBooking:true }, raw: text };
-
-  // greetings
-  if (/\b(h+i+|hello|hey)\b/i.test(t)) return { intent:'greeting', entities:{}, flags:{}, raw: text };
-  if (/\bhow are you\b/i.test(t)) return { intent:'how_are_you', entities:{}, flags:{}, raw: text };
-
-  // pagination
-  if (detectPagination(t)) return { intent:'paginate', entities:{}, flags:{}, raw: text };
-
-  // compare
-  const cmp = detectCompare(t);
-  if (cmp.askCheapest || cmp.askExpensive || cmp.askMostExperienced)
-    return { intent:'compare', entities:{}, flags:{...cmp}, raw: text };
-
-  // filters
-  const filters = parseFilters(t);
-
-  // name lookup
-  const name = detectNameLookup(text);
-  if (name) return { intent:'name_lookup', entities:{ name, filters }, flags:{}, raw: text };
-
-  // explicit specialties by name
-  const explicitSpecs = matchExplicitSpecialty(t, dbSpecs);
-  // inferred by body part/symptoms
-  const inferredSpecs = inferByBodyPart(t);
-
-  // show doctors detector (top priority)
-  if (wantDoctors(t, prevOffered)) {
-    return {
-      intent: 'show_doctors',
-      entities: { explicitSpecs, inferredSpecs, filters },
-      flags: { prevOffered },
-      raw: text
-    };
-  }
-
-  // refinements only (no specialty text but filters present)
-  if (Object.keys(filters).length && !explicitSpecs.length && !inferredSpecs.length && !lastSpecialty) {
-    return { intent:'refine_ask_specialty', entities:{ filters }, flags:{}, raw: text };
-  }
-  if (Object.keys(filters).length && (explicitSpecs.length || inferredSpecs.length || lastSpecialty)) {
-    return { intent:'refine', entities:{ filters, explicitSpecs, inferredSpecs }, flags:{}, raw: text };
-  }
-
-  // explicit specialty intent
-  if (explicitSpecs.length) {
-    return { intent:'specialty_explicit', entities: { explicitSpecs, filters }, flags:{}, raw: text };
-  }
-
-  // symptoms intent (general)
-  const flags = {
-    emergency: emergencyCautionNeeded(t)
-  };
-  const safeTips = minorSafeTips(t);
-  return { intent:'symptoms', entities: { inferredSpecs, filters, safeTips }, flags, raw: text };
-}
-
-// empathetic one-liner (OpenAI optional)
-export async function summarizeEmpathetic(openai, raw) {
-  const fallback = "Sorry you’re dealing with that.";
-  if (!raw || !raw.trim()) return fallback;
-  if (!openai) return `${fallback}`;
+  if (!openai) return local;
 
   try {
+    const prompt = [
+      "You are an empathetic medical triage assistant.",
+      "Given the user's message, produce a single empathetic sentence (<=25 words) summarizing what they’re experiencing.",
+      "Do NOT diagnose or recommend medications. Avoid clinical jargon.",
+      "User message:\n",
+      rawText
+    ].join('\n');
+
     const resp = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      temperature: 0.1,
       messages: [
-        { role: 'system', content: 'You write ultra-brief, empathetic health summaries. No directives or questions.' },
-        { role: 'user', content: `Summarize empathetically in <= 120 chars, no questions: """${raw}"""` }
-      ]
+        { role: 'system', content: 'You are an empathetic, concise medical assistant.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.2,
+      max_tokens: 60
     });
-    return resp.choices?.[0]?.message?.content?.trim() || fallback;
+
+    const out = resp?.choices?.[0]?.message?.content?.trim();
+    return out || local;
   } catch {
-    return fallback;
+    return local;
   }
+}
+
+/* ------------------ PATTERNS ------------------ */
+
+const YES = /\b(y|yes|yeah|yup|ok|okay|sure|please|do it|go ahead|affirmative|proceed)\b/i;
+
+const GREETING = /\b(hi|hello|hey|salam|salaam|aoa)\b/i;
+const HOW_ARE_YOU = /\b(how\s*are\s*you|how r u|howru|how are u|how r you|hoe r u|h r u)\b/i;
+
+// very permissive “show doctors” triggers (verbs + doctor variant)
+const SHOW_DOCTORS = [
+  /\b(show|give|send|provide|list|share|find|get|book)\s+(me\s+)?((a|the)\s+)?(suitable|relevant|any)?\s*(doc|doctor|doctors|dr|drs|specialist|specialists)\b/i,
+  /\b(show\s*(doc|doctor|doctors|dr|drs))\b/i,
+  /\b(doc|doctor|doctors)\s*(please|now)\b/i,
+  /\b(need|want)\s+(a|the)?\s*(doc|doctor|specialist)\b/i
+];
+
+// pagination
+const PAGINATE = /\b(more|next|load\s*more|show\s*more)\b/i;
+
+// rude/offensive (very small list; keep minimal)
+const ABUSIVE = /\b(fuck|idiot|stupid|shut\s*up)\b/i;
+
+// booking/transactions
+const BOOKING = /\b(book|schedule|reserve|pay|payment|checkout|purchase)\b/i;
+
+// platform help
+const HMS_HELP = /\b(reschedule|cancel\s*appointment|upload\s*reports?|where\s*is\s*my\s*appointment|how\s*to\s*use|help\s*with\s*pandoc)\b/i;
+
+// out-of-scope: ask for non-health topics
+const OUT_OF_SCOPE = /\b(stock|bitcoin|btc|politics|election|weather|sports\s*score|movie|news)\b/i;
+
+// comparisons
+const ASK_CHEAPEST = /\b(cheapest|lowest\s*price|least\s*expensive)\b/i;
+const ASK_EXPENSIVE = /\b(most\s*expensive|highest\s*price|costliest)\b/i;
+const ASK_MOST_EXP = /\b(most\s*experienced|senior|max\s*experience|highest\s*experience)\b/i;
+
+// refinements
+const FEMALE = /\b(female|woman|lady)\b/i;
+const MALE = /\b(male|man|gent)\b/i;
+const CHEAPEST = /\b(cheapest|affordable|low\s*cost)\b/i;
+const EXPENSIVE = /\b(expensive|premium)\b/i;
+const UNDER_PRICE = /\b(under|below|within|upto|up\s*to)\s*\$?\s*(\d{1,5})\b/i;
+const EXP_MIN = /\b(\d{1,2})\s*\+?\s*(years?|yrs?)\s*(experience|exp)?\b/i;
+const WANT_BEST = /\b(best|top|most\s*experienced|senior)\b/i;
+
+// name lookup
+const NAME_LOOKUP = /\bdr\.?\s*([a-z][a-z\s.'-]{1,40})$/i;
+
+// symptom keywords → specialty inference; plus colloquial “<part> doctor”
+const MAP = {
+  'Neurologist': [
+    /\b(neuro|brain|migraine|seiz(ure|ing)?|stroke|head\s*(injury|ache|pain))\b/i,
+    /\b(brain\s*(doc|doctor|specialist))\b/i
+  ],
+  'Dermatologist': [
+    /\b(dermat|skin|rash|acne|eczema|psoriasis|itch|hives)\b/i,
+    /\b(skin\s*(doc|doctor|specialist))\b/i
+  ],
+  'Cardiology': [
+    /\b(cardio|heart|chest\s*pain|palpitation|short(ness)?\s*of\s*breath)\b/i,
+    /\b(heart\s*(doc|doctor|specialist))\b/i
+  ],
+  'Otolaryngology (ENT)': [
+    /\b(ent|ear|nose|throat|sinus|tonsil)\b/i,
+    /\b(ear|nose|throat)\s*(doc|doctor|specialist)\b/i
+  ],
+  'Ophthalmology': [
+    /\b(eye|vision|red\s*eye|conjunctivitis)\b/i,
+    /\b(eye\s*(doc|doctor|specialist))\b/i
+  ],
+  'Urology': [
+    /\b(uro|urine|urinary|prostate|kidney\s*stone|uti)\b/i,
+    /\b(ur(ology|ologist)?\s*(doc|doctor|specialist))\b/i
+  ],
+  'Gastroenterologist': [
+    /\b(gastro|stomach|abd(omen|ominal)|acid|reflux|nausea|vomit|diarrhea|constipation)\b/i,
+    /\b(stomach|abdomen)\s*(doc|doctor|specialist)\b/i
+  ],
+  'Gynecologist': [
+    /\b(obgyn|gyne|gyn|pregnan|pelvic|period|menstrual|pcos)\b/i,
+    /\b(gyne(cologist)?\s*(doc|doctor|specialist))\b/i
+  ],
+  'Pediatricians': [
+    /\b(pediat|child|kid|infant|baby)\b/i,
+    /\b(child|kids?)\s*(doc|doctor|specialist)\b/i
+  ],
+  'Endocrinology, Diabetes & Metabolism': [
+    /\b(endocrin|thyroid|diabet|hormone|metab)\b/i,
+    /\b(thyroid|diabetes?)\s*(doc|doctor|specialist)\b/i
+  ],
+  'Orthopedic Surgery': [
+    /\b(ortho|orthop(ae|e)dic|bone|joint|knee|shoulder|fracture|sprain|dislocat|back\s*pain|spine)\b/i,
+    /\b(bone|joint|knee|shoulder|back|spine)\s*(doc|doctor|specialist)\b/i
+  ],
+  'Sports Medicine': [
+    /\b(sports\s*med|sports\s*injury|strain|ligament|tendon)\b/i
+  ],
+  'Psychiatry': [
+    /\b(psych|anxiet(y|ies)?|depress(ion)?|panic|bipolar|ocd)\b/i,
+    /\b(mental\s*health)\b/i
+  ],
+  'Emergency Medicine': [
+    /\b(fell\s*(off|from)\s*(bike|bicycle|motor\s*bike|motorbike|motorcycle|scooter)|bike\s*(fall|accident|crash)|road\s*rash|accident|crash|collision|hit\s*by|trauma|severe\s*bleeding|can.t\s*breathe|fainted|head\s*injury)\b/i
+  ]
+};
+
+/**
+ * Try to match an explicit specialty by name, using dbSpecs as the source of truth.
+ * Accepts plural/singular and partials like "derma", "cardio".
+ */
+function matchExplicitSpecialty(text, dbSpecs = []) {
+  const out = [];
+  for (const s of dbSpecs) {
+    const base = normalize(s);
+    const token = base.replace(/\s*&\s*/g, ' & ').replace(/\s+/g, ' ').trim();
+    // accept “derma”, “cardio”, etc.
+    const head = token.split(' ')[0];
+    const rx = new RegExp(`\\b(${escapeRx(token)}|${escapeRx(head)})s?\\b`, 'i');
+    if (rx.test(text)) out.push(s);
+  }
+  return [...new Set(out)];
+}
+
+/**
+ * Infer specialties from symptoms/body-part slang.
+ */
+function inferSpecialties(text) {
+  const hits = new Set();
+  for (const [spec, arr] of Object.entries(MAP)) {
+    for (const r of arr) if (r.test(text)) hits.add(spec);
+  }
+  return [...hits];
+}
+
+/**
+ * Extract filters/gender/price/experience/best from free text.
+ */
+function extractFilters(text) {
+  const filters = {};
+
+  if (FEMALE.test(text)) filters.gender = 'female';
+  else if (MALE.test(text)) filters.gender = 'male';
+
+  if (CHEAPEST.test(text)) filters.price = 'cheapest';
+  else if (EXPENSIVE.test(text)) filters.price = 'expensive';
+
+  const cap = text.match(UNDER_PRICE);
+  if (cap) filters.price = { cap: parseInt(cap[2], 10) };
+
+  const em = text.match(EXP_MIN);
+  if (em) filters.expMin = parseInt(em[1], 10);
+
+  if (WANT_BEST.test(text)) filters.wantBest = true;
+
+  return filters;
+}
+
+/**
+ * Parse a turn. Return a consistent, forgiving intent + entities bundle.
+ * This function is intentionally order-biased to reduce ambiguity.
+ */
+export function parseTurn({ text: raw, dbSpecs = [], prevOffered = false, lastSpecialty = null }) {
+  const text = normalize(raw || '');
+
+  const entities = {
+    explicitSpecs: [],
+    inferredSpecs: [],
+    filters: {},
+    name: null,
+    safeTips: []
+  };
+  const flags = {
+    abusive: false,
+    wantsBooking: false,
+    askCheapest: false,
+    askExpensive: false,
+    askMostExperienced: false
+  };
+
+  if (!text) return { intent: 'unknown', entities, flags };
+
+  // 0) quick flags
+  if (ABUSIVE.test(text)) flags.abusive = true;
+  if (BOOKING.test(text)) flags.wantsBooking = true;
+
+  // 1) out of scope
+  if (OUT_OF_SCOPE.test(text)) return { intent: 'out_of_scope', entities, flags };
+
+  // 2) greetings
+  if (GREETING.test(text)) return { intent: 'greeting', entities, flags };
+  if (HOW_ARE_YOU.test(text)) return { intent: 'how_are_you', entities, flags };
+
+  // 3) platform help
+  if (HMS_HELP.test(text)) return { intent: 'hms_help', entities, flags };
+
+  // 4) pagination
+  if (PAGINATE.test(text)) return { intent: 'paginate', entities, flags };
+
+  // 5) comparisons
+  if (ASK_CHEAPEST.test(text)) { flags.askCheapest = true; return { intent: 'compare', entities, flags }; }
+  if (ASK_EXPENSIVE.test(text)) { flags.askExpensive = true; return { intent: 'compare', entities, flags }; }
+  if (ASK_MOST_EXP.test(text)) { flags.askMostExperienced = true; return { intent: 'compare', entities, flags }; }
+
+  // 6) name lookup (dr <name>)
+  {
+    const m = text.match(NAME_LOOKUP);
+    if (m && m[1]) {
+      entities.name = m[1].trim();
+      entities.filters = extractFilters(text);
+      return { intent: 'name_lookup', entities, flags };
+    }
+  }
+
+  // 7) explicit specialty by DB names
+  entities.explicitSpecs = matchExplicitSpecialty(text, dbSpecs);
+  if (entities.explicitSpecs.length) {
+    entities.filters = extractFilters(text);
+    return { intent: 'specialty_explicit', entities, flags };
+  }
+
+  // 8) direct SHOW DOCTORS triggers
+  if (SHOW_DOCTORS.some(rx => rx.test(text))) {
+    entities.filters = extractFilters(text);
+
+    // look for “<part> doctor” phrasing to pick a spec immediately
+    const inferred = inferSpecialties(text);
+    if (inferred.length) entities.inferredSpecs = inferred;
+
+    return { intent: 'show_doctors', entities, flags };
+  }
+
+  // 9) confirmation after offer (“yes/ok/please”)
+  if (prevOffered && YES.test(text)) {
+    // keep it show_doctors; let route pick lastSpecialty when listing
+    entities.filters = extractFilters(text);
+    entities.inferredSpecs = inferSpecialties(text); // might refine lastSpecialty
+    return { intent: 'show_doctors', entities, flags };
+  }
+
+  // 10) refinements (gender/price/experience) if user already has context
+  const maybeFilters = extractFilters(text);
+  if (Object.keys(maybeFilters).length) {
+    entities.filters = maybeFilters;
+    // carry inferredSpecs too (e.g. “female brain doctor”)
+    const inferred = inferSpecialties(text);
+    if (inferred.length) entities.inferredSpecs = inferred;
+    return { intent: 'refine', entities, flags };
+  }
+
+  // 11) symptoms → infer specialties; we keep it forgiving
+  const inferred = inferSpecialties(text);
+  if (inferred.length) {
+    entities.inferredSpecs = inferred;
+    // add safe, generic tips (non-diagnostic)
+    if (inferred.includes('Emergency Medicine')) {
+      entities.safeTips.push('If symptoms are severe (heavy bleeding, head injury, trouble breathing), please seek emergency care first.');
+    }
+    return { intent: 'symptoms', entities, flags };
+  }
+
+  // 12) unknown → let route decide fallback message
+  return { intent: 'unknown', entities, flags };
 }
