@@ -7,6 +7,7 @@ const DoctorList = ({ payload }) => {
         <div key={doc._id} className="p-4 rounded border border-gray-200">
           <p className="font-semibold">{i + 1}. {doc.name}</p>
           <p className="text-sm text-gray-700">Speciality: {doc.speciality}</p>
+          {doc.gender ? <p className="text-sm text-gray-700">Gender: {doc.gender}</p> : null}
           <p className="text-sm text-gray-700">Experience: {doc.experience}</p>
           <p className="text-sm text-gray-700">Fee: ${doc.fees}</p>
           <a
@@ -19,9 +20,6 @@ const DoctorList = ({ payload }) => {
           </a>
         </div>
       ))}
-      <p className="text-xs text-gray-500">
-        *I can help refine this list, but I don’t recommend any specific doctor.
-      </p>
     </div>
   );
 };

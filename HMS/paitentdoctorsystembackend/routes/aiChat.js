@@ -1,35 +1,39 @@
 import express from 'express';
 import 'dotenv/config.js';
 import OpenAI from 'openai';
+import mongoose from 'mongoose';
 import doctorModel from '../models/doctorModel.js';
+import Specialty from '../models/Specialty.js';
 
 const router = express.Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// --- helpers ---
+// ---------- helpers ----------
 const STRIP_YEARS = (s='') => {
   const n = parseInt(String(s).match(/\d+/)?.[0] || '0', 10);
   return isNaN(n) ? 0 : n;
 };
 
+function conversationText(messages=[]) {
+  return messages.map(m => `${m.role}: ${m.content}`).join('\n');
+}
+
 function lastUserWantsDoctors(txt='') {
   const t = txt.toLowerCase();
   return /\b(doctor|doctors|give me (a|the) doctor|find (a|the) doctor|see (a|the) doctor|book|appointment|who should i see|show doctors|yes show|yes please|show me)\b/.test(t);
 }
-
 function userSeemsDone(txt='') {
   const t = txt.toLowerCase();
   return /\b(that'?s all|nothing more|no other|nothing else|that is it|that'?s it)\b/.test(t);
 }
-
 function extractHeuristicPrefs(txt='') {
   const t = txt.toLowerCase();
   let gender = null;
   if (/\bfemale\b/.test(t)) gender = 'female';
   if (/\bmale\b/.test(t)) gender = 'male';
   let pricePref = null;
-  if (/\bcheapest|cheap|low( |-)?cost|budget\b/.test(t)) pricePref = 'cheapest';
-  if (/\bexpensive|premium|top( |-)?tier|highest fee\b/.test(t)) pricePref = 'expensive';
+  if (/\b(cheapest|cheap|low( |-)?cost|budget)\b/.test(t)) pricePref = 'cheapest';
+  if (/\b(expensive|premium|top( |-)?tier|highest fee)\b/.test(t)) pricePref = 'expensive';
   let expMin = null;
   const m = t.match(/(\d+)\+?\s*(years?|yrs?)\s*(experience)?/);
   if (m) expMin = parseInt(m[1], 10);
@@ -37,14 +41,63 @@ function extractHeuristicPrefs(txt='') {
   return { gender, pricePref, expMin, wantBest };
 }
 
+// Build a tolerant name regex: "dr emily king" → /(^|\b)emily\s+king(\b|$)/i
+function buildNameRegex(name='') {
+  const cleaned = String(name).replace(/dr\.?|doctor/ig, ' ').replace(/[^a-zA-Z\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!cleaned) return null;
+  const tokens = cleaned.split(' ').filter(Boolean);
+  if (tokens.length === 0) return null;
+  const pattern = tokens.map(t => `${escapeRegex(t)}`).join('\\s+');
+  return new RegExp(`(^|\\b)${pattern}(\\b|$)`, 'i');
+}
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Try to guess a doctor name directly from the user’s latest text.
+// Returns string | null
+function guessDoctorNameFromText(txt='') {
+  // “dr emily king”, “doctor emily king”
+  const m1 = txt.match(/(?:\bdr\.?\b|\bdoctor\b)\s+([a-z][a-z]+(?:\s+[a-z][a-z]+){0,2})/i);
+  if (m1) return m1[1];
+  // Quoted names: "Emily King"
+  const m2 = txt.match(/"([a-z][a-z]+(?:\s+[a-z][a-z]+){0,2})"/i);
+  if (m2) return m2[1];
+  // Last fallback: if they say “Dr. Emily”, “Emily King please”
+  const m3 = txt.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/);
+  if (m3 && /\b(dr|doctor|please|want|need|see)\b/i.test(txt)) return m3[1];
+  return null;
+}
+
+// Find specialties explicitly mentioned by the user from DB list (case-insensitive substring)
+async function findMentionedSpecialtiesInText(txt='') {
+  const t = txt.toLowerCase();
+  const specs = await Specialty.find({ active: true }).select('name').lean();
+  const found = [];
+  for (const s of specs) {
+    const name = (s.name || '').toLowerCase();
+    if (!name) continue;
+    if (t.includes(name)) found.push(s.name);
+  }
+  // simple synonyms
+  if (/\bdermatolog(y|ist)\b/i.test(txt)) found.push('Dermatologist');
+  if (/\bcardiolog(y|ist)\b/i.test(txt)) found.push('Cardiology');
+  if (/\bneurolog(y|ist)\b/i.test(txt)) found.push('Neurologist');
+  if (/\bent\b|\bear|nose|throat/i.test(txt)) found.push('Otolaryngology (ENT)');
+  if (/\bgyn|gynecolog/i.test(txt)) found.push('Gynecologist');
+  if (/\bpediatric/i.test(txt)) found.push('Pediatricians');
+  if (/\bgastro|stomach|abdomen/i.test(txt)) found.push('Gastroenterologist');
+  // dedupe
+  return Array.from(new Set(found));
+}
+
+// Fallback mapping from symptoms → specialties (including trauma)
 function fallbackSpecialtiesFromText(text='') {
   const t = text.toLowerCase();
   const picks = new Set();
-
-  // direct specialty words
   if (/\bdermat(o|ology|ologist)|skin\b/.test(t)) picks.add('Dermatologist');
   if (/\bcardio|chest pain|heart\b/.test(t)) picks.add('Cardiology');
-  if (/\bneuro|nerv|seiz|stroke|head injur(y)?\b/.test(t)) picks.add('Neurologist');
+  if (/\bneuro|nerv|seiz|stroke|head injur(y)?|headache\b/.test(t)) picks.add('Neurologist');
   if (/\bpsych|anxiety|depress|mental\b/.test(t)) picks.add('Psychiatry');
   if (/\bent|ear|nose|throat\b/.test(t)) picks.add('Otolaryngology (ENT)');
   if (/\bophthal|eye\b/.test(t)) picks.add('Ophthalmology');
@@ -63,20 +116,13 @@ function fallbackSpecialtiesFromText(text='') {
     picks.add('Emergency Medicine'); picks.add('Wound Care'); picks.add('General Surgery');
   }
 
-  if (picks.size === 0) picks.add('General physician'); // ultimate fallback
+  if (picks.size === 0) picks.add('General physician');
   return Array.from(picks);
 }
 
-function conversationText(messages=[]) {
-  return messages.map(m => `${m.role}: ${m.content}`).join('\n');
-}
-
-async function queryDoctors({ specialties, gender, pricePref, expMin, wantBest }) {
+async function queryDoctorsBySpecialties({ specialties, gender, pricePref, expMin, wantBest }) {
   if (!Array.isArray(specialties) || specialties.length === 0) specialties = ['General physician'];
-
-  // Build OR by specialties (case-insensitive)
-  const or = specialties.map(s => ({ speciality: { $regex: new RegExp(`^${s}$`, 'i') } }));
-
+  const or = specialties.map(s => ({ speciality: { $regex: new RegExp(`^${escapeRegex(s)}$`, 'i') } }));
   const query = { available: true, $or: or };
   if (gender) query.gender = new RegExp(`^${gender}$`, 'i');
 
@@ -85,48 +131,87 @@ async function queryDoctors({ specialties, gender, pricePref, expMin, wantBest }
     .select('_id name speciality fees experience degree image address gender')
     .lean();
 
-  // Filter by minimum experience if asked
   if (typeof expMin === 'number' && expMin > 0) {
     docs = docs.filter(d => STRIP_YEARS(d.experience) >= expMin);
   }
 
-  // Sort strategy
   if (pricePref === 'cheapest') {
     docs.sort((a, b) => a.fees - b.fees);
   } else if (pricePref === 'expensive') {
     docs.sort((a, b) => b.fees - a.fees);
   } else if (wantBest) {
-    // interpret "best" as most experienced (ties broken by lower fee)
     docs.sort((a, b) => {
       const d = STRIP_YEARS(b.experience) - STRIP_YEARS(a.experience);
       return d !== 0 ? d : (a.fees - b.fees);
     });
   } else {
-    // default: stable-ish order by specialty then name
     docs.sort((a, b) => (a.speciality || '').localeCompare(b.speciality || '') || (a.name||'').localeCompare(b.name||''));
   }
 
-  // Return ALL matches (your request). If you ever need cap, slice here.
+  return docs; // ALL matches
+}
+
+async function queryDoctorsByName({ name, gender, pricePref, expMin, wantBest }) {
+  const rx = buildNameRegex(name);
+  if (!rx) return [];
+  const query = { available: true, name: rx };
+  if (gender) query.gender = new RegExp(`^${gender}$`, 'i');
+
+  let docs = await doctorModel
+    .find(query)
+    .select('_id name speciality fees experience degree image address gender')
+    .lean();
+
+  if (typeof expMin === 'number' && expMin > 0) {
+    docs = docs.filter(d => STRIP_YEARS(d.experience) >= expMin);
+  }
+
+  // If multiple docs share the same name and specialty, we return ALL of them as requested.
+  if (pricePref === 'cheapest') {
+    docs.sort((a, b) => a.fees - b.fees);
+  } else if (pricePref === 'expensive') {
+    docs.sort((a, b) => b.fees - a.fees);
+  } else if (wantBest) {
+    docs.sort((a, b) => {
+      const d = STRIP_YEARS(b.experience) - STRIP_YEARS(a.experience);
+      return d !== 0 ? d : (a.fees - b.fees);
+    });
+  } else {
+    docs.sort((a, b) => (a.speciality || '').localeCompare(b.speciality || '') || (a.name||'').localeCompare(b.name||''));
+  }
+
+  // If no exact-ish name matches, try a looser contains search as "closest one"
+  if (docs.length === 0) {
+    const loose = new RegExp(escapeRegex(String(name).trim()), 'i');
+    const altQuery = { available: true, name: loose };
+    if (gender) altQuery.gender = new RegExp(`^${gender}$`, 'i');
+    docs = await doctorModel
+      .find(altQuery)
+      .select('_id name speciality fees experience degree image address gender')
+      .lean();
+  }
+
   return docs;
 }
 
+// ---------- OpenAI prompt ----------
 const SYSTEM_PROMPT = `
 You are "Pandoc Health Assistant" for the Pandoc HMS.
 
 SCOPE
-- Only health/wellness or Pandoc platform. Refuse other topics politely and steer back.
+- Health/wellness or Pandoc platform only. If outside scope, politely refuse and steer back.
 - No diagnosis, meds, dosages, or treatment plans. No external links.
 
 STYLE
 - Empathetic and concise: <= 2 short sentences (<= 220 chars).
 - Answer small-talk briefly ("I'm doing well and here to help with your health.").
-- Use full history; don't repeat questions. Ask at most ONE focused follow-up only if truly needed.
+- Use full history; don't repeat prior questions. Ask at most ONE focused follow-up only if truly needed.
 
 INTENT & PREFERENCES
 - If user asks to see doctors/book, "intent":"show_doctors".
-- Infer gender preference ("male"|"female"|null), price preference ("cheapest"|"expensive"|null), min experience in years (number|null), and specialties (1–3 strings).
-- If requested specialty not available or unclear, choose the closest reasonable specialties; if nothing fits, use "General physician".
-- If user wants "best doctor", interpret as "most experienced".
+- If user names a doctor or a specialty explicitly, prefer that target.
+- Infer gender ("male"|"female"|null), price ("cheapest"|"expensive"|null), min experience years (number|null), and specialties (1–3 strings).
+- If requested specialty doesn’t exist or is unclear, choose closest reasonable specialties; if nothing fits, use "General physician".
 - Do NOT say "I can help refine the list".
 
 OUTPUT valid JSON ONLY:
@@ -140,18 +225,23 @@ OUTPUT valid JSON ONLY:
     "price": "cheapest" | "expensive" | null,
     "min_experience_years": number | null,
     "want_best": boolean | null
+  },
+  "direct": {
+    "doctor_name": string | null,
+    "specialties": string[] | null
   }
 }
 Keep assistant_message <= 220 chars.
 `;
 
+// ---------- route ----------
 router.post('/chat', async (req, res) => {
   try {
     const { messages = [] } = req.body;
     const latestUser = [...messages].reverse().find(m => m.role === 'user')?.content || '';
+    const convo = conversationText(messages);
     const forceShow = lastUserWantsDoctors(latestUser);
     const doneFeeling = userSeemsDone(latestUser);
-    const convo = conversationText(messages);
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -160,24 +250,35 @@ router.post('/chat', async (req, res) => {
       response_format: { type: 'json_object' },
     });
 
-    let parsed;
-    try { parsed = JSON.parse(completion.choices?.[0]?.message?.content || '{}'); }
-    catch { parsed = {}; }
-
+    let parsed = {};
+    try { parsed = JSON.parse(completion.choices?.[0]?.message?.content || '{}'); } catch {}
     let assistant_message = parsed.assistant_message || "How can I help you with your health today?";
     let intent = parsed.intent || 'chat';
     let specialties = Array.isArray(parsed.specialties) ? parsed.specialties : null;
     const prefs = parsed.preferences || {};
     let { gender=null, price=null, min_experience_years=null, want_best=null } = prefs;
+    const direct = parsed.direct || {};
+    let directName = direct.doctor_name || null;
+    let directSpecs = Array.isArray(direct.specialties) ? direct.specialties : null;
 
-    // Heuristic fallbacks (in case the model missed them)
+    // Heuristic fallbacks
     const heur = extractHeuristicPrefs(latestUser);
     gender = gender || heur.gender;
     price = price || heur.pricePref;
-    min_experience_years = (typeof min_experience_years === 'number' ? min_experience_years : null) || heur.expMin || null;
-    want_best = (typeof want_best === 'boolean' ? want_best : null) || heur.wantBest || null;
+    const expMin = (typeof min_experience_years === 'number' ? min_experience_years : null) || heur.expMin || null;
+    const wantBest = (typeof want_best === 'boolean' ? want_best : null) || heur.wantBest || null;
 
-    // Show doctors if explicitly asked, unless refused
+    // Explicit doctor/specialty detection from user text (server-side)
+    if (!directName) {
+      const n = guessDoctorNameFromText(latestUser);
+      if (n) directName = n;
+    }
+    if (!directSpecs || directSpecs.length === 0) {
+      const mentioned = await findMentionedSpecialtiesInText(latestUser);
+      if (mentioned.length) directSpecs = mentioned;
+    }
+
+    // Force show if user asked
     if (forceShow && intent !== 'refuse') {
       intent = 'show_doctors';
       if (!specialties || specialties.length === 0) specialties = fallbackSpecialtiesFromText(convo);
@@ -186,39 +287,78 @@ router.post('/chat', async (req, res) => {
       }
     }
 
-    // If user says they’re done but hasn’t asked for doctors: suggest
+    // If user done but not asked yet → suggest
     if (!forceShow && doneFeeling && intent !== 'refuse' && intent !== 'show_doctors') {
       assistant_message = "Understood. Would you like me to show doctors that fit your needs?";
       intent = 'chat';
     }
 
-    // If we’re showing doctors, ensure specialties are present (fallback if needed)
     let doctors = [];
-    if (intent === 'show_doctors') {
-      if (!specialties || specialties.length === 0) specialties = fallbackSpecialtiesFromText(convo);
 
-      // CLOSE CATEGORY fallback: if none found in first pass, broaden with General physician
-      doctors = await queryDoctors({
-        specialties,
-        gender,
-        pricePref: price,
-        expMin: min_experience_years,
-        wantBest: want_best
+    // 1) Direct NAME takes priority
+    if (directName) {
+      intent = 'show_doctors';
+      doctors = await queryDoctorsByName({
+        name: directName, gender, pricePref: price, expMin, wantBest
       });
 
-      if (doctors.length === 0 && !specialties.includes('General physician')) {
-        doctors = await queryDoctors({
-          specialties: [...specialties, 'General physician'],
-          gender,
-          pricePref: price,
-          expMin: min_experience_years,
-          wantBest: want_best
-        });
+      // If name found and user ALSO provided a specialty explicitly, narrow to those specialties (still return ALL matches)
+      if (doctors.length && directSpecs && directSpecs.length) {
+        const set = new Set(directSpecs.map(s => s.toLowerCase()));
+        doctors = doctors.filter(d => set.has((d.speciality || '').toLowerCase()));
       }
 
+      // If still empty, but they named a specialty, show that specialty
+      if (doctors.length === 0 && directSpecs && directSpecs.length) {
+        doctors = await queryDoctorsBySpecialties({ specialties: directSpecs, gender, pricePref: price, expMin, wantBest });
+      }
+
+      // If still empty → closest specialty from convo (or General physician)
       if (doctors.length === 0) {
-        intent = 'request_more_info';
-        assistant_message = "I can pull the right specialists. Is the problem mainly joint-related or something else?";
+        const closeSpecs = fallbackSpecialtiesFromText(convo);
+        doctors = await queryDoctorsBySpecialties({ specialties: closeSpecs, gender, pricePref: price, expMin, wantBest });
+      }
+
+      // Message for direct name ask
+      if (!assistant_message || /describe|symptom/i.test(assistant_message)) {
+        assistant_message = doctors.length
+          ? "Here are the matching doctors."
+          : "I didn’t find that exact doctor. Here are close matches.";
+      }
+    }
+
+    // 2) Direct SPECIALTY (without name) → show all in that specialty
+    if (!directName && (!doctors.length) && directSpecs && directSpecs.length) {
+      intent = 'show_doctors';
+      doctors = await queryDoctorsBySpecialties({ specialties: directSpecs, gender, pricePref: price, expMin, wantBest });
+
+      if (doctors.length === 0) {
+        // closest / general fallback
+        const closeSpecs = Array.from(new Set([...directSpecs, ...fallbackSpecialtiesFromText(convo)]));
+        doctors = await queryDoctorsBySpecialties({ specialties: closeSpecs, gender, pricePref: price, expMin, wantBest });
+      }
+
+      if (!assistant_message || /describe|symptom/i.test(assistant_message)) {
+        assistant_message = doctors.length
+          ? "Here are doctors for that specialty."
+          : "I couldn’t find that specialty here. Showing close options.";
+      }
+    }
+
+    // 3) If we still don't have doctors but intent=show_doctors from LLM or forced
+    if (!doctors.length && intent === 'show_doctors') {
+      if (!specialties || specialties.length === 0) specialties = fallbackSpecialtiesFromText(convo);
+      doctors = await queryDoctorsBySpecialties({ specialties, gender, pricePref: price, expMin, wantBest });
+      if (doctors.length === 0 && !specialties.includes('General physician')) {
+        doctors = await queryDoctorsBySpecialties({
+          specialties: [...specialties, 'General physician'],
+          gender, pricePref: price, expMin, wantBest
+        });
+      }
+      if (!assistant_message || /describe|symptom/i.test(assistant_message)) {
+        assistant_message = doctors.length
+          ? "Here are doctors that match what you described."
+          : "I can pull the right specialists. Is the issue mainly joint-related or something else?";
       }
     }
 
