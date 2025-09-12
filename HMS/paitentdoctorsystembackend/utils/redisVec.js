@@ -39,7 +39,7 @@ export async function ensureIndex() {
       'text',  'TEXT',
       'kind',  'TAG',
       'tenant','TAG',
-      'embedding', 'VECTOR', 'HNSW', '6',
+      'embedding', 'VECTOR', 'HNSW', '12',
         'TYPE', 'FLOAT32',
         'DIM', String(DIM),
         'DISTANCE_METRIC', DIST,
