@@ -246,7 +246,7 @@ if (!raw) {
       ctx.lastOfferWasShowDoctors = false;
       ctx.messages.push({ role: 'assistant', content: reply });
       await saveCtx(tenantId, userId, chatId, ctx);
-      return res.json({ success: true, reply, doctors: cardsFromDocs(ctx.lastList) });
+      return res.json({ success: true, reply, intent: 'show_doctors', doctors: cardsFromDocs(ctx.lastList) });
     }
 
     // ---------- show doctors (direct ask or confirmation) ----------
@@ -283,7 +283,7 @@ if (!raw) {
         : 'No matching doctors right now.';
       ctx.messages.push({ role: 'assistant', content: reply });
       await saveCtx(tenantId, userId, chatId, ctx);
-      return res.json({ success: true, reply, doctors: cardsFromDocs(results) });
+      return res.json({ success: true, reply, intent: 'show_doctors', doctors: cardsFromDocs(results) });
     }
 
     // ---------- explicit specialty ----------
@@ -309,7 +309,7 @@ if (!raw) {
       const reply = results.length ? 'Here are doctors for that specialty.' : 'No matching doctors right now.';
       ctx.messages.push({ role: 'assistant', content: reply });
       await saveCtx(tenantId, userId, chatId, ctx);
-      return res.json({ success: true, reply, doctors: cardsFromDocs(results) });
+      return res.json({ success: true, reply, intent: 'show_doctors', doctors: cardsFromDocs(results) });
     }
 
     // ---------- refine (gender/price/experience) ----------
@@ -340,7 +340,7 @@ if (!raw) {
       const reply = results.length ? 'Updated list.' : 'No matching doctors with those filters.';
       ctx.messages.push({ role: 'assistant', content: reply });
       await saveCtx(tenantId, userId, chatId, ctx);
-      return res.json({ success: true, reply, doctors: cardsFromDocs(results) });
+      return res.json({ success: true, reply, intent: 'show_doctors', doctors: cardsFromDocs(results) });
     }
 
     // ---------- compare (works on last list) ----------
@@ -394,7 +394,7 @@ if (!raw) {
       ctx.lastOfferWasShowDoctors = false;
       ctx.messages.push({ role: 'assistant', content: reply });
       await saveCtx(tenantId, userId, chatId, ctx);
-      return res.json({ success: true, reply, doctors: cardsFromDocs(results) });
+      return res.json({ success: true, reply, intent: 'show_doctors', doctors: cardsFromDocs(results) });
     }
 
     // ---------- unknown ----------
