@@ -3,6 +3,13 @@ import bcrypt from "bcrypt";
 import doctorModel from "../models/doctorModel.js";
 import appointmentModel from "../models/appointmentModel.js";
 
+function dateKeyFor(d) {
+  const dd = d.getDate();
+  const mm = d.getMonth() + 1;
+  const yyyy = d.getFullYear();
+  return `${dd}_${mm}_${yyyy}`; // e.g., 12_9_2025
+}
+
 // API for doctor Login 
 const loginDoctor = async (req, res) => {
 
@@ -189,6 +196,56 @@ const doctorDashboard = async (req, res) => {
         res.json({ success: false, message: error.message })
     }
 }
+
+export const adminBackfillSlots = async (req, res) => {
+  try {
+    const token = req.header("X-Task-Token");
+    if (!token || token !== process.env.MAINTENANCE_TOKEN) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    // how many future days we want keys for
+    const days = Math.max(1, Math.min(parseInt(req.body?.days || "30", 10), 120));
+
+    // Build the date keys we’ll ensure exist
+    const keys = [];
+    const today = new Date();
+    for (let i = 0; i < days; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      keys.push(dateKeyFor(d));
+    }
+
+    // Iterate through available doctors
+    const cursor = doctorModel.find({ available: true }).select({ _id: 1, slots_booked: 1 }).cursor();
+
+    let scanned = 0;
+    let updated = 0;
+
+    for await (const doc of cursor) {
+      scanned++;
+      const missing = {};
+      const sb = doc.slots_booked || {};
+
+      for (const k of keys) {
+        if (!(k in sb)) {
+          // create empty array for that date (meaning: all default UI times are free)
+          missing[`slots_booked.${k}`] = [];
+        }
+      }
+
+      if (Object.keys(missing).length) {
+        await doctorModel.updateOne({ _id: doc._id }, { $set: missing });
+        updated++;
+      }
+    }
+
+    return res.json({ success: true, scanned, updated, days });
+  } catch (err) {
+    console.error("[backfill-slots] error", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 export {
     loginDoctor,
