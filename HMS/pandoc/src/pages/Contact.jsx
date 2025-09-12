@@ -28,7 +28,7 @@ const Contact = () => {
             Washington, USA
           </p>
           <p className=" text-gray-500">
-            Tel: +1 (202) 555-0199 <br /> Email: info@mypandoc.com
+            Tel: +1 (202) 555-0198 <br /> Email: info@mypandoc.com
           </p>
           <p className=" font-semibold text-lg text-gray-600">
             CAREERS AT Pandoc
