@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useContext } from 'react';
-import { AppContext } from '../context/AppContext';
+import { AppContext } from '.../AppContext';
 import { useNavigate } from 'react-router-dom';
 
 function uuid() {
