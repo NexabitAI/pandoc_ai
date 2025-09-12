@@ -16,7 +16,9 @@ const doctorSchema = new mongoose.Schema({
   },
   available: { type: Boolean, default: true },
   gender: { type: String, enum: ['male', 'female'], default: null }, // ← NEW
-  date: { type: Number, required: true }
+  date: { type: Number, required: true },
+  slots_booked: { type: Object, default: () => ({}) }
+
 });
 
 const doctorModel = mongoose.models.doctor || mongoose.model('doctor', doctorSchema);
