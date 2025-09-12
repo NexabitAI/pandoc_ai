@@ -12,12 +12,12 @@ const Footer = () => {
             alt=""
           />
           <p className="w-full md:w-2/3 text-gray-600 leading-6">
-            Lorem Ipsum is a  simply dummy text of the printing
-            and typesetting industry. Lorem Ipsum has been
-            the industry's standard dummy text ever since
-            the 1500s, when an unknown printer took a galley
-            of type and scrambled it to make a type specimen
-            book.
+            Pandoc is a powerful universal document converter for
+writers and developers. It reads Markdown, HTML,
+LaTeX, and more, then outputs clean PDFs, Word,
+or web pages with citations and code blocks, all
+while keeping styles consistent and repeatable
+across projects and teams.
           </p>
         </div>
 
@@ -38,8 +38,8 @@ const Footer = () => {
             GET IN TOUCH
           </p>
           <ul className="flex flex-col gap-2 text-gray-600">
-            <li>Pandoc Phone No.</li>
-            <li>@pandoc.com</li>
+            <li>+1 (202) 555-0199</li>
+            <li>info@mypandoc.com</li>
           </ul>
         </div>
       </div>
@@ -47,7 +47,7 @@ const Footer = () => {
       <div>
         <hr />
         <p className="py-5 text-sm text-center">
-          Copyright 2024 @ Pandoc.com - All Right Reserved.
+          Copyright 2025 @ mypandoc.com - All Right Reserved.
         </p>
       </div>
     </div>
