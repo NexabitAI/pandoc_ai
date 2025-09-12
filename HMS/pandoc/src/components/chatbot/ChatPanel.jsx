@@ -72,7 +72,7 @@ export default function ChatPanel({ onClose }) {
         {messages.map((m, i) => {
           const isUser = m.role === "user";             // user LEFT, assistant RIGHT (as requested)
           return (
-            <div key={i} className={`flex ${isUser ? "justify-start" : "justify-end"}`}>
+            <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
               <div
                 className={[
                   "max-w-[80%] rounded-xl px-3 py-2 text-[14px] leading-5 whitespace-pre-wrap",
@@ -87,7 +87,7 @@ export default function ChatPanel({ onClose }) {
       </div>
 
       {/* Composer */}
-      <div className="border-t bg-white p-3">
+      <div className="bg-white p-3">
         <div className="flex gap-2">
           <textarea
             value={input}
