@@ -39,43 +39,68 @@ async function listSpecialtyNames() {
   return rows.map((r) => r.name);
 }
 
+// doctor query (same core as before, with a tiny fallback)
 async function queryDoctors({ specialties, gender, price, expMin, wantBest, page, pageSize }) {
+  const exactSpecRX = s => new RegExp(`^${String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}$`,'i');
+  const looseSpecRX = s => new RegExp(String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'.*'),'i');
+
   const or = (specialties && specialties.length)
-    ? specialties.map((s) => ({ speciality: { $regex: exactSpecRX(s) } }))
+    ? specialties.map(s => ({ speciality: { $regex: exactSpecRX(s) } }))
     : [{ speciality: { $regex: /Emergency Medicine/i } }];
 
   const q = { available: true, $or: or };
   if (gender) q.gender = new RegExp(`^${gender}$`, 'i');
 
+  // 1st pass: exact speciality
   let docs = await doctorModel
     .find(q)
     .select('_id name speciality fees experience degree image address gender')
     .lean();
 
-  if (expMin) docs = docs.filter((d) => stripYears(d.experience) >= expMin);
-  if (price && typeof price === 'object' && typeof price.cap === 'number') {
-    docs = docs.filter((d) => Number(d.fees) <= price.cap);
+  // Fallback: if none, try loose contains on speciality
+  if (!docs.length && specialties?.length) {
+    const q2 = {
+      available: true,
+      $or: specialties.map(s => ({ speciality: { $regex: looseSpecRX(s) } }))
+    };
+    if (gender) q2.gender = new RegExp(`^${gender}$`, 'i');
+    docs = await doctorModel
+      .find(q2)
+      .select('_id name speciality fees experience degree image address gender')
+      .lean();
   }
 
-  if (price === 'cheapest') docs.sort((a, b) => a.fees - b.fees);
-  else if (price === 'expensive') docs.sort((a, b) => b.fees - a.fees);
+  // Filters
+  const stripYears = s => {
+    const n = parseInt(String(s||'').replace(/[^\d]/g,''),10);
+    return Number.isFinite(n) ? n : 0;
+  };
+  if (expMin) docs = docs.filter(d => stripYears(d.experience) >= expMin);
+  if (price && typeof price === 'object' && typeof price.cap === 'number') {
+    docs = docs.filter(d => Number(d.fees) <= price.cap);
+  }
+
+  // Sorting
+  if (price === 'cheapest') docs.sort((a,b)=>a.fees-b.fees);
+  else if (price === 'expensive') docs.sort((a,b)=>b.fees-a.fees);
   else if (wantBest) {
-    docs.sort((a, b) => {
-      const d = stripYears(b.experience) - stripYears(a.experience);
-      return d !== 0 ? d : a.fees - b.fees;
+    docs.sort((a,b)=>{
+      const d = stripYears(b.experience)-stripYears(a.experience);
+      return d!==0? d : (a.fees-b.fees);
     });
   } else {
-    docs.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    docs.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   }
 
-  const start = (page - 1) * pageSize;
+  // Pagination
+  const start = (page-1)*pageSize;
   return {
-    results: docs.slice(start, start + pageSize),
+    results: docs.slice(start, start+pageSize),
     total: docs.length,
-    page,
-    pageSize,
+    page, pageSize
   };
 }
+
 
 // ---------- health + reset ----------
 router.get('/ai/health', (_req, res) => res.json({ ok: true }));
