@@ -9,7 +9,7 @@ if (!MONGODB_URI) {
 }
 
 const DAYS_AHEAD = 365;
-
+// hi test piplines
 const TIMES = [
   "10:00 AM",
   "02:00 PM",
@@ -55,7 +55,7 @@ async function main() {
 
 main().catch(async (err) => {
   console.error(err);
-  try { await mongoose.disconnect(); } catch {}
+  try { await mongoose.disconnect(); } catch { }
   process.exit(1);
 });
 
