@@ -2,7 +2,7 @@ import "dotenv/config.js";
 import mongoose from "mongoose";
 import doctorModel from "../models/doctorModel.js";
 
-const MONGODB_URI = "mongodb://mypandocAppUser:nexabitai%40%232026@localhost:27017/mypandoc?authSource=mypandoc";
+const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
   console.error("Missing MONGODB_URI in .env");
   process.exit(1);
