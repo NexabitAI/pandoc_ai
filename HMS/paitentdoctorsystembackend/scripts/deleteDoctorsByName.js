@@ -7,9 +7,10 @@ const TARGETS = ['Dr. Ava White'];
 
 // Build ^name$ (case-insensitive) regex safely
 const toExactRegex = (s) => new RegExp(`^${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+const MONGODB_URI = "mongodb://mypandocAppUser:nexabitai%40%232026@localhost:27017/mypandoc?authSource=mypandoc";
 
 (async () => {
-  if (!process.env.MONGODB_URI) {
+  if (!MONGODB_URI) {
     console.error('Missing MONGO_URL in .env');
     process.exit(1);
   }
