@@ -1,7 +1,7 @@
 // tests/simulate.js
 import fetch from 'node-fetch';
 
-const BASE = process.env.CHAT_URL || 'http://127.0.0.1:5000/api/ai/chat';
+const BASE = process.env.CHAT_URL || 'https://mypandoc.com/api/ai/chat';
 const tenantId = 'default', userId = 'test-user', chatId = 'sim-1';
 
 async function send(message) {

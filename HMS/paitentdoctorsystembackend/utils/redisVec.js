@@ -4,7 +4,7 @@ import 'dotenv/config';
 
 const INDEX = 'idx:rag:docs';
 const PREFIX = 'rag:doc:';
-const DIM = Number(process.env.EMBED_DIM || 1536);   // must match your embedding model
+export const DIM = Number(process.env.EMBED_DIM || 1536);   // must match your embedding model
 const DIST = process.env.EMBED_DIST || 'COSINE';     // COSINE | L2 | IP
 
 let client;

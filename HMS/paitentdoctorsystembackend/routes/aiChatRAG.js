@@ -404,9 +404,16 @@ if (!raw) {
     await saveCtx(tenantId, userId, chatId, ctx);
     return res.json({ success: true, reply, doctors: [] });
   } catch (e) {
-    console.error('[ai/chat] error', e);
-    return res.status(500).json({ success: false, message: 'AI service error' });
-  } finally {
+  console.error('[ai/chat] FULL ERROR:', 
+    e.response?.data || e.message || e
+  );
+  return res.status(500).json({
+    success: false,
+    message: 'AI service error',
+    error: e.response?.data?.error?.message || e.message || 'unknown'
+  });
+}
+ finally {
     // timing is already logged elsewhere if needed
   }
 }

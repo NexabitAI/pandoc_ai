@@ -1,3 +1,4 @@
+
 import express from "express"
 import cors from 'cors'
 import 'dotenv/config'
@@ -23,7 +24,7 @@ app.use(cors({
   origin: [
     "https://mypandoc.com",
     "https://www.mypandoc.com",
-    "https://admin.mypandoc.com"
+    "https://admin.mypandoc.com",
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true
@@ -43,3 +44,4 @@ app.get("/api", (req, res) => {
 });
 
 app.listen(port, () => console.log(`Server started on PORT:${port}`))
+

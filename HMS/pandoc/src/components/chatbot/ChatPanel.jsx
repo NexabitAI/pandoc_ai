@@ -21,7 +21,7 @@ export default function ChatPanel({ onClose }) {
     setBusy(true);
 
     try {
-      const base = import.meta.env.VITE_API_BASE || ""; // keep relative proxy working
+      const base = import.meta.env.VITE_API_BASE || "https://mypandoc.com"; // keep relative proxy working
       const r = await fetch(`${base}/api/ai/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
