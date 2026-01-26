@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import doctorModel from '../models/doctorModel.js';
 
 // Names to delete (exact match, case-insensitive)
-const TARGETS = ['sample', 'sample 2'];
+const TARGETS = ['Dr. Ava White'];
 
 // Build ^name$ (case-insensitive) regex safely
 const toExactRegex = (s) => new RegExp(`^${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
@@ -31,6 +31,6 @@ const toExactRegex = (s) => new RegExp(`^${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$
   process.exit(0);
 })().catch(async (e) => {
   console.error('Error:', e.message);
-  try { await mongoose.disconnect(); } catch {}
+  try { await mongoose.disconnect(); } catch { }
   process.exit(1);
 });
