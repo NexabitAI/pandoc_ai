@@ -1,8 +1,9 @@
-// import "dotenv/config.js";
+import "dotenv/config.js";
 import mongoose from "mongoose";
 import doctorModel from "../models/doctorModel.js";
 
 const MONGODB_URI = process.env.MONGODB_URI;
+console.log(MONGODB_URI, "not loading .env")
 if (!MONGODB_URI) {
   console.error("Missing MONGODB_URI in .env");
   process.exit(1);
