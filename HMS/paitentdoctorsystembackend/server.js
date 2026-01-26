@@ -10,8 +10,7 @@ import adminRouter from "./routes/adminRoute.js"
 import getSpecialityRoute from "./routes/getSpeciality.js";
 import specialtiesRouter from './routes/specialties.js';
 import aiChatRAG from './routes/aiChatRAG.js';
-import dotenv from 'dotenv'
-dotenv.config()
+
 // app config
 const app = express()
 const port = process.env.PORT || 4000
