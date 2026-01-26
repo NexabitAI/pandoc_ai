@@ -1,4 +1,4 @@
-import "dotenv/config.js";
+// import "dotenv/config.js";
 import mongoose from "mongoose";
 import doctorModel from "../models/doctorModel.js";
 
