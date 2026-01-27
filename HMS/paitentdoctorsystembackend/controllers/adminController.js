@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 import validator from "validator";
 import { v2 as cloudinary } from "cloudinary";
 import userModel from "../models/userModel.js";
+import { generateDefaultSlots } from "../utils/defaultSlots.js";
 
 // API for admin login
 const loginAdmin = async (req, res) => {
@@ -99,6 +100,7 @@ const addDoctor = async (req, res) => {
             about,
             fees,
             address: JSON.parse(address),
+            slots_booked: generateDefaultSlots(),
             date: Date.now()
         }
 
