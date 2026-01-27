@@ -1,4 +1,3 @@
-
 import express from "express"
 import cors from 'cors'
 import 'dotenv/config'
@@ -11,15 +10,16 @@ import getSpecialityRoute from "./routes/getSpeciality.js";
 import specialtiesRouter from './routes/specialties.js';
 import aiChatRAG from './routes/aiChatRAG.js';
 
-// app config
 const app = express()
+app.disable("etag")
+
 const port = process.env.PORT || 4000
 connectDB()
 connectCloudinary()
 
 // middlewares
-
 app.use(express.json({ limit: '1mb' }))
+
 app.use(cors({
   origin: [
     "https://mypandoc.com",
@@ -29,7 +29,18 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true
 }));
+
 app.options("*", cors());
+
+// ✅ NO CACHE FOR APIs
+app.use("/api", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.type("application/json");
+  next();
+});
+
 // api endpoints
 app.use("/api/user", userRouter)
 app.use("/api/admin", adminRouter)
@@ -38,10 +49,8 @@ app.use("/api/get-speciality", getSpecialityRoute)
 app.use('/api/specialties', specialtiesRouter);
 app.use('/api', aiChatRAG);
 
-
 app.get("/api", (req, res) => {
   res.send("API Working")
 });
 
 app.listen(port, () => console.log(`Server started on PORT:${port}`))
-
