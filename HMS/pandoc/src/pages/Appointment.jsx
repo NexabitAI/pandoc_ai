@@ -94,7 +94,7 @@ const Appointment = () => {
 
         // guard: slots loaded
         if (!docSlots[slotIndex] || docSlots[slotIndex].length === 0) {
-            toast.error("Please select a valid date");
+            toast.error("Please also select a time slot");
             return;
         }
 
