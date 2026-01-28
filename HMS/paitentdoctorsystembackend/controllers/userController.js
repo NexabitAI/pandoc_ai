@@ -252,7 +252,7 @@ const bookAppointment = async (req, res) => {
         console.error("BOOK APPOINTMENT ERROR:", error);
         res.status(500).json({
             success: false,
-            message: "Server error",
+            message: "Server errors",
         });
     }
 };
