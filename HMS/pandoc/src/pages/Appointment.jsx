@@ -108,7 +108,7 @@ const Appointment = () => {
                 getDoctosData()
                 navigate('/my-appointments')
             } else {
-                toast.error(data.message)
+                toast.error(error.response.data.message)
             }
 
         } catch (error) {
