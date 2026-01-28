@@ -108,7 +108,7 @@ const Appointment = () => {
                 getDoctosData()
                 navigate('/my-appointments')
             } else {
-                error.response?.data?.message || "Something went wrong"
+                error.data?.message || "Something went wrong"
             }
 
         } catch (error) {
