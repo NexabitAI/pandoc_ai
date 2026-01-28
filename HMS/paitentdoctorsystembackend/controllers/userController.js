@@ -189,13 +189,13 @@ const updateProfile = async (req, res) => {
 
 const bookAppointment = async (req, res) => {
     try {
-        const { docId, slotDate, slotTime } = req.body;
-        const userId = req.userId;
+        const { docId, slotDate, slotTime, userId } = req.body;
+        // const userId = req.userId;
 
         if (!userId) {
             return res.status(401).json({
                 success: false,
-                message: "Unauthorized. Please login again.",
+                message: "Please login again first for book an appointment.",
             });
         }
 
