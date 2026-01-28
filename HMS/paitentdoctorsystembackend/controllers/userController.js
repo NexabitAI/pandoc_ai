@@ -189,9 +189,10 @@ const updateProfile = async (req, res) => {
 
 const bookAppointment = async (req, res) => {
     try {
-        const { userId, docId, slotDate, slotTime } = req.body;
+        const { docId, slotDate, slotTime } = req.body;
+        const userId = req.userId; // ✅ FROM TOKEN
 
-        if (!userId || !docId) {
+        if (!docId) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid booking request",
@@ -211,8 +212,6 @@ const bookAppointment = async (req, res) => {
                 message: "Please also select a time slot",
             });
         }
-
-
 
         const docData = await doctorModel.findById(docId).select("-password");
 
@@ -255,6 +254,7 @@ const bookAppointment = async (req, res) => {
         res.json({ success: false, message: error.message });
     }
 };
+
 
 
 // API to cancel appointment
