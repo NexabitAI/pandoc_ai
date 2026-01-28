@@ -30,7 +30,6 @@ jobs:
             git reset --hard
             git pull origin main
             npm install
-            pm2 restart all || true
 
             # Pandoc frontend
             cd /var/www/pandoc_ai/HMS/pandoc
@@ -38,7 +37,6 @@ jobs:
             git pull origin main
             npm install
             npm run build
-            pm2 restart all || true
 
             # Pandocadmin frontend
             cd /var/www/pandoc_ai/HMS/pandocadmin
