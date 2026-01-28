@@ -190,86 +190,73 @@ const updateProfile = async (req, res) => {
 const bookAppointment = async (req, res) => {
     try {
         const { docId, slotDate, slotTime } = req.body;
-        const userId = req.userId; // from JWT
+        const userId = req.userId;
 
-        if (!docId) {
-            return res.status(400).json({
+        if (!userId) {
+            return res.status(401).json({
                 success: false,
-                message: "Invalid booking request",
+                message: "Unauthorized. Please login again.",
             });
         }
 
-        if (!slotDate) {
+        if (!docId || !slotDate || !slotTime) {
             return res.status(400).json({
                 success: false,
-                message: "Please select a date",
+                message: "Please select date and time",
             });
         }
 
-        if (!slotTime) {
+        const userData = await userModel.findById(userId).select("-password");
+        if (!userData) {
             return res.status(400).json({
                 success: false,
-                message: "Please also select a time slot",
+                message: "User not found",
             });
         }
 
-        const docData = await doctorModel.findById(docId).select("-password");
-
+        const docData = await doctorModel.findById(docId);
         if (!docData || !docData.available) {
-            return res.json({
-                success: false,
-                message: "Doctor not available",
-            });
+            return res.json({ success: false, message: "Doctor not available" });
         }
 
         let slots_booked = docData.slots_booked || {};
 
         if (!slots_booked[slotDate]) {
-            return res.json({
-                success: false,
-                message: "Invalid slot date",
-            });
+            slots_booked[slotDate] = [];
         }
 
         if (slots_booked[slotDate].includes(slotTime)) {
-            return res.json({
-                success: false,
-                message: "Slot already booked",
-            });
+            return res.json({ success: false, message: "Slot already booked" });
         }
 
-        // book slot
         slots_booked[slotDate].push(slotTime);
 
-        const userData = await userModel.findById(userId).select("-password");
-        delete docData.slots_booked;
+        const docSafeData = docData.toObject();
+        delete docSafeData.slots_booked;
 
-        const appointmentData = {
+        await appointmentModel.create({
             userId,
             docId,
             userData,
-            docData,
+            docData: docSafeData,
             amount: docData.fees,
             slotTime,
             slotDate,
             date: Date.now(),
-        };
+        });
 
-        await new appointmentModel(appointmentData).save();
         await doctorModel.findByIdAndUpdate(docId, { slots_booked });
 
-        res.json({
-            success: true,
-            message: "Appointment Booked",
-        });
+        res.json({ success: true, message: "Appointment Booked" });
     } catch (error) {
-        console.log(error);
+        console.error("BOOK APPOINTMENT ERROR:", error);
         res.status(500).json({
             success: false,
             message: "Server error",
         });
     }
 };
+
 
 
 
