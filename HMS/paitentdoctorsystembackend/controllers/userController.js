@@ -191,12 +191,28 @@ const bookAppointment = async (req, res) => {
     try {
         const { userId, docId, slotDate, slotTime } = req.body;
 
-        if (!userId || !docId || !slotDate || !slotTime) {
+        if (!userId || !docId) {
             return res.status(400).json({
                 success: false,
-                message: "Missing booking details",
+                message: "Invalid booking request",
             });
         }
+
+        if (!slotDate) {
+            return res.status(400).json({
+                success: false,
+                message: "Please select a date",
+            });
+        }
+
+        if (!slotTime) {
+            return res.status(400).json({
+                success: false,
+                message: "Please also select a time slot",
+            });
+        }
+
+
 
         const docData = await doctorModel.findById(docId).select("-password");
 
