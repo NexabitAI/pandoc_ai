@@ -88,35 +88,51 @@ const Appointment = () => {
     const bookAppointment = async () => {
 
         if (!token) {
-            toast.warning('Login to book appointment')
-            return navigate('/login')
+            toast.warning("Login to book appointment");
+            return navigate("/login");
         }
 
-        const date = docSlots[slotIndex][0].datetime
+        // guard: slots loaded
+        if (!docSlots[slotIndex] || docSlots[slotIndex].length === 0) {
+            toast.error("Please select a valid date");
+            return;
+        }
 
-        let day = date.getDate()
-        let month = date.getMonth() + 1
-        let year = date.getFullYear()
+        // guard: time selected
+        if (!slotTime) {
+            toast.error("Please also select a time slot");
+            return;
+        }
 
-        const slotDate = day + "_" + month + "_" + year
+        const date = docSlots[slotIndex][0].datetime;
+
+        const day = date.getDate();
+        const month = date.getMonth() + 1;
+        const year = date.getFullYear();
+
+        const slotDate = `${day}_${month}_${year}`;
 
         try {
+            const { data } = await axios.post(
+                `${backendUrl}/api/user/book-appointment`,
+                { docId, slotDate, slotTime },
+                { headers: { token } }
+            );
 
-            const { data } = await axios.post(backendUrl + '/api/user/book-appointment', { docId, slotDate, slotTime }, { headers: { token } })
             if (data.success) {
-                toast.success(data.message)
-                getDoctosData()
-                navigate('/my-appointments')
+                toast.success(data.message);
+                getDoctosData();
+                navigate("/my-appointments");
             } else {
-                error.data?.message || "Something went wrong"
+                toast.error(data.message);
             }
-
         } catch (error) {
-            console.log(error)
-            toast.error(error.message)
+            toast.error(
+                error.response?.data?.message || "Something went wrong"
+            );
         }
+    };
 
-    }
 
     useEffect(() => {
         if (doctors.length > 0) {

@@ -190,7 +190,7 @@ const updateProfile = async (req, res) => {
 const bookAppointment = async (req, res) => {
     try {
         const { docId, slotDate, slotTime } = req.body;
-        const userId = req.userId; // ✅ FROM TOKEN
+        const userId = req.userId; // from JWT
 
         if (!docId) {
             return res.status(400).json({
@@ -216,19 +216,29 @@ const bookAppointment = async (req, res) => {
         const docData = await doctorModel.findById(docId).select("-password");
 
         if (!docData || !docData.available) {
-            return res.json({ success: false, message: "Doctor not available" });
+            return res.json({
+                success: false,
+                message: "Doctor not available",
+            });
         }
 
         let slots_booked = docData.slots_booked || {};
 
         if (!slots_booked[slotDate]) {
-            return res.json({ success: false, message: "Invalid slot date" });
+            return res.json({
+                success: false,
+                message: "Invalid slot date",
+            });
         }
 
         if (slots_booked[slotDate].includes(slotTime)) {
-            return res.json({ success: false, message: "Slot already booked" });
+            return res.json({
+                success: false,
+                message: "Slot already booked",
+            });
         }
 
+        // book slot
         slots_booked[slotDate].push(slotTime);
 
         const userData = await userModel.findById(userId).select("-password");
@@ -248,12 +258,19 @@ const bookAppointment = async (req, res) => {
         await new appointmentModel(appointmentData).save();
         await doctorModel.findByIdAndUpdate(docId, { slots_booked });
 
-        res.json({ success: true, message: "Appointment Booked" });
+        res.json({
+            success: true,
+            message: "Appointment Booked",
+        });
     } catch (error) {
         console.log(error);
-        res.json({ success: false, message: error.message });
+        res.status(500).json({
+            success: false,
+            message: "Server error",
+        });
     }
 };
+
 
 
 
