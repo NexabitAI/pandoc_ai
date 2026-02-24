@@ -16,47 +16,124 @@ const razorpayInstance = new razorpay({
 })
 
 // API to register user
-const registerUser = async (req, res) => {
+// const registerUser = async (req, res) => {
 
+//     try {
+//         const { name, email, password } = req.body;
+
+//         // checking for all data to register user
+//         if (!name || !email || !password) {
+//             return res.json({ success: false, message: 'Missing Details' })
+//         }
+
+//         // validating email format
+//         if (!validator.isEmail(email)) {
+//             return res.json({ success: false, message: "Please enter a valid email" })
+//         }
+
+//         // validating strong password
+//         if (password.length < 8) {
+//             return res.json({ success: false, message: "Please enter a strong password" })
+//         }
+
+//         // hashing user password
+//         const salt = await bcrypt.genSalt(10); // the more no. round the more time it will take
+//         const hashedPassword = await bcrypt.hash(password, salt)
+
+//         const userData = {
+//             name,
+//             email,
+//             password: hashedPassword,
+//         }
+
+//         const newUser = new userModel(userData)
+//         const user = await newUser.save()
+//         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET)
+
+//         res.json({ success: true, token })
+
+//     } catch (error) {
+//         console.log(error)
+//         res.json({ success: false, message: error.message })
+//     }
+// }
+const registerUser = async (req, res) => {
     try {
         const { name, email, password } = req.body;
 
-        // checking for all data to register user
+        // Check required fields
         if (!name || !email || !password) {
-            return res.json({ success: false, message: 'Missing Details' })
+            return res.status(400).json({
+                success: false,
+                message: "All fields are required",
+            });
         }
 
-        // validating email format
+        // Validate email
         if (!validator.isEmail(email)) {
-            return res.json({ success: false, message: "Please enter a valid email" })
+            return res.status(400).json({
+                success: false,
+                message: "Please enter a valid email",
+            });
         }
 
-        // validating strong password
+        // Validate password strength
         if (password.length < 8) {
-            return res.json({ success: false, message: "Please enter a strong password" })
+            return res.status(400).json({
+                success: false,
+                message: "Password must be at least 8 characters",
+            });
         }
 
-        // hashing user password
-        const salt = await bcrypt.genSalt(10); // the more no. round the more time it will take
-        const hashedPassword = await bcrypt.hash(password, salt)
+        // ✅ Check if user already exists
+        const existingUser = await userModel.findOne({ email });
+        if (existingUser) {
+            return res.status(409).json({
+                success: false,
+                message: "Email already registered",
+            });
+        }
 
-        const userData = {
+        // Hash password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const newUser = new userModel({
             name,
             email,
             password: hashedPassword,
-        }
+        });
 
-        const newUser = new userModel(userData)
-        const user = await newUser.save()
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET)
+        const user = await newUser.save();
 
-        res.json({ success: true, token })
+        const token = jwt.sign(
+            { id: user._id },
+            process.env.JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        res.status(201).json({
+            success: true,
+            token,
+        });
 
     } catch (error) {
-        console.log(error)
-        res.json({ success: false, message: error.message })
+        console.error(error);
+
+        // ✅ Handle duplicate key error fallback
+        if (error.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message: "Email already registered",
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: "Something went wrong. Please try again.",
+        });
     }
-}
+};
 
 // API to login user
 const loginUser = async (req, res) => {
