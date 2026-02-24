@@ -90,7 +90,7 @@ const registerUser = async (req, res) => {
         if (existingUser) {
             return res.status(409).json({
                 success: false,
-                message: "Email already registered",
+                message: "User already registered",
             });
         }
 
